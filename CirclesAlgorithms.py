@@ -388,13 +388,11 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
 
     OUTPUT = 'OUTPUT'
     INPUT = 'INPUT'
-    ANALYSIS_LAYER = 'ANALYSIS_LAYER'
     COLUMN = 'COLUMN'
     MAX_RADIUS = 'MAX_RADIUS'
     MAX_VALUE = 'MAX_VALUE'
     SHAPE = 'SHAPE'
     METHOD = 'METHOD'
-    EXTENDED_ANALYSIS = 'EXTENDED ANALYSIS'
     LEGEND = 'LEGEND'
 
     def initAlgorithm(self, config):
@@ -429,7 +427,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         )
 
         
-        self.shapes = [self.tr('Circles'), self.tr('Squares')]
+        self.shapes = [self.tr('Circles'), self.tr('Diamons'), self.tr('Squares')]
         self.addParameter(QgsProcessingParameterEnum(
                 self.SHAPE,
                 self.tr('Type of representation'),
@@ -439,32 +437,20 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         
 
         self.addParameter(
-            QgsProcessingParameterFeatureSource(
-                self.ANALYSIS_LAYER,
-                self.tr('Polygon layer used for an automatic scale'),
-                [QgsProcessing.TypeVectorAnyGeometry],
-                optional=True
-            )
-        )
-        
-        
-        params = []
-
-        params.append(
             QgsProcessingParameterNumber(
                 self.MAX_VALUE,
                 self.tr('Max value'),
                 minValue=0,
-                optional=True
+                optional=False
             )
         )
         
-        params.append(
+        self.addParameter(
             QgsProcessingParameterNumber(
                 self.MAX_RADIUS,
                 self.tr('Max radius (in meters)'),
                 minValue=0,
-                optional=True
+                optional=False
             )
         )
 
@@ -473,9 +459,6 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
                 self.tr('Add an automatic legend layer'),
                 defaultValue=False))
                 
-        for param in params:
-            param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
-            self.addParameter(param)
             
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
@@ -498,41 +481,10 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         
         source = self.parameterAsSource(parameters, self.INPUT, context).materialize(QgsFeatureRequest())
         stockValue = self.parameterAsString(parameters, self.COLUMN , context)  
-        """
-        sqlQuerry = 'select * from input1 order by {0} DESC'.format(stockValue)
-        source = processing.run("qgis:executesql",
-                {'INPUT_DATASOURCES':[source0.sourceName()],
-                 'INPUT_QUERY':sqlQuerry,
-                 'INPUT_UID_FIELD':'',
-                 'INPUT_GEOMETRY_FIELD':'',
-                 'INPUT_GEOMETRY_TYPE':0,
-                 'INPUT_GEOMETRY_CRS':None,
-                 'OUTPUT':'memory:'},
-                 feedback=feedback)
-        # QgsMessageLog.logMessage("extended : {0}".format(dir(source)), 'Thematic Plugin', 0)                  
-        """
 
         OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)
         
-        if source.geometryType() == QgsWkbTypes.PolygonGeometry :
-            # feedback.pushInfo(self.tr('Transformation en points'))
-            source2 = processing.run("native:pointonsurface", 
-                                    {'INPUT':source ,
-                                     'ALL_PARTS':False,
-                                     'OUTPUT':'memory:'},
-                                     feedback=feedback)
-            source = source2['OUTPUT']
-                                    
-        analysisLayer = self.parameterAsSource(parameters, self.ANALYSIS_LAYER, context)
-
-        features = analysisLayer.materialize(QgsFeatureRequest()).getFeatures()
-        layerArea = sum([element.geometry().area() for element in features])
-             
-        selectedPoints = processing.run("native:saveselectedfeatures", 
-                    {'INPUT':source,
-                     'OUTPUT':'memory:'})
-
-        features = selectedPoints['OUTPUT'].getFeatures()
+        features = source.getFeatures()
         attributeList = sorted([abs(element[stockValue]) for element in features], reverse=True)
         val1 = attributeList[0]
         if attributeList[1] <= val1 / 3 :
@@ -543,16 +495,12 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
             val3= attributeList[2]
         else :
             val3 = val2/3
-        QgsMessageLog.logMessage("Liste :{0}".format(type(attributeList)), 'Thematic Plugin', 0)
+        
+        maxRadius = self.parameterAsInt(parameters,self.MAX_RADIUS,context)
+        maxValue = self.parameterAsInt(parameters,self.MAX_VALUE,context)        
 
-        summary = processing.run("qgis:basicstatisticsforfields", 
-                        {'INPUT_LAYER':selectedPoints['OUTPUT'],
-                            'FIELD_NAME':stockValue
-                        },
-                        feedback = feedback)
-
-        radiusFormula = '2*sqrt(abs({0})*{1}/(7*pi()*{2}))'.format(stockValue, layerArea, summary['SUM'])
-            
+        radiusFormula = '{0} * sqrt(abs({1})/{2})'.format(maxRadius,stockValue,maxValue)
+        feedback.pushInfo(self.tr("formule du rayon : {0}".format(radiusFormula)))            
         fieldList = [field.name() for field in source.fields()]    
         
         valueName, radiusName, varName = 'VAL', 'R', 'VARIABLE'
@@ -567,6 +515,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         valueName       += iLabel
         radiusName      += iLabel
         varName    += iLabel
+        
         # Ajout de la colonne R
         radiusAttribute = processing.run("qgis:fieldcalculator", 
                         {'INPUT':source,
@@ -578,13 +527,8 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
                          'FORMULA':radiusFormula,
                          'OUTPUT':'memory:'},
                           feedback=feedback)
-    
-        QgsMessageLog.logMessage("source : {0}".format(source.id()), 'Thematic Plugin', 0)
-        'select *, {0} as {1} from output order by {2} DESC'
-        sqlQuery = 'select *, {0} as {1} from input1 order by {2} DESC'.format(stockValue,valueName , stockValue)
-        sqlQuery = 'select * from input1'     
-        QgsMessageLog.logMessage("sqlQuery : {0}".format(sqlQuery), 'Thematic Plugin', 0)
        
+        # Type of symbols
         represetation = self.parameterAsInt( parameters, self.SHAPE, context )
         if self.parameterAsInt( parameters, self.SHAPE, context ) == 0:
             # circles
@@ -594,9 +538,15 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         else:
             # squares
             representation = 0
-        """
+
+        centroid = processing.run("native:centroids", 
+                        {'INPUT':radiusAttribute['OUTPUT'],
+                         'ALL_PARTS':False,
+                         'OUTPUT':'memory:'},
+                          feedback = feedback)   
+
         result = processing.run("qgis:rectanglesovalsdiamondsvariable",
-                        {'INPUT': radiusAttribute['OUTPUT'],
+                        {'INPUT': centroid['OUTPUT'],
                          'SHAPE':representation,
                          'WIDTH':'R',
                          'HEIGHT':'R',
@@ -604,32 +554,9 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
                          'SEGMENTS':36,
                          'OUTPUT':OUTPUT},
                           feedback = feedback)
-        """
-        self.oldMaxRadius = 110
-        self.oldMaxValue  = 110 
-        
-        # crs = source2.crs().authid()
-        OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)
-
-
-        
-
-        # feedback.pushInfo(self.tr('Création des ronds'))    
-        result = processing.run("qgis:rectanglesovalsdiamondsvariable",
-                        {'INPUT': radiusAttribute['OUTPUT'],
-                         'SHAPE':representation,
-                         'WIDTH':'R',
-                         'HEIGHT':'R',
-                         'ROTATION':None,
-                         'SEGMENTS':36,
-                         'OUTPUT':OUTPUT},
-                          feedback = feedback)
-                          
-        QgsMessageLog.logMessage("result : {0}".format(result['OUTPUT']), 'Thematic Plugin', 0)    
 
         feedback.pushInfo('____________________')
         feedback.pushInfo('')
-        feedback.pushInfo(self.tr('   Analyse en ronds étendue'))        
         feedback.pushInfo(self.tr("     • Valeur représentée : {0}".format(stockValue)))
         # feedback.pushInfo('Analyse étendue : {0} '.format(extendedAnalysis))
         feedback.pushInfo('')
@@ -643,11 +570,6 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo("     • val3 : {0}".format(val3))        
         feedback.pushInfo('____________________')
         feedback.pushInfo('')  
-        
-        global defaultMaxValue
-        global defaultMaxRadius
-        defaultMaxValue = 100
-        defaultMaxRadius = 100
         
         return {self.OUTPUT: 'OUTPUT'}
         
