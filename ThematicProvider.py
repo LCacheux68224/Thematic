@@ -32,6 +32,7 @@ __revision__ = '$Format:%H$'
 
 from qgis.core import QgsProcessingProvider
 from .SmoothingAlgorithms import CreateGridAlgorithm
+from .SmoothingAlgorithms import CreateInspireGridAlgorithm
 from .SmoothingAlgorithms import SmoothToGridAlgorithm
 
 from .CirclesAlgorithms import CreateAutomaticSymbolsAlgorithm
@@ -48,6 +49,7 @@ class ThematicProvider(QgsProcessingProvider):
         # Load algorithms
         self.alglist = [CreateGridAlgorithm(),
                         SmoothToGridAlgorithm(),
+                        CreateInspireGridAlgorithm(),
                         CreateAutomaticSymbolsAlgorithm(),
                         CreateCustomSymbolsAlgorithm(),
                         CreateCirclesLegendAlgorithm()]
