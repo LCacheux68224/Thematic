@@ -173,7 +173,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                  feedback=feedback)
         # QgsMessageLog.logMessage("extended : {0}".format(dir(source)), 'Thematic Plugin', 0)                  
         """
-        
+        '''
         if source.geometryType() == QgsWkbTypes.PolygonGeometry :
             # feedback.pushInfo(self.tr('Transformation en points'))
             source2 = processing.run("native:pointonsurface", 
@@ -182,7 +182,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                                      'OUTPUT':'memory:'},
                                      feedback=feedback)
             source = source2['OUTPUT']
-
+        '''
         # area of the analysis layer for automatic scale
         features = analysisLayer.materialize(QgsFeatureRequest()).getFeatures()
         layerArea = sum([element.geometry().area() for element in features])
@@ -199,7 +199,8 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                      'OUTPUT':'memory:'})
                      
         features = selectedPoints['OUTPUT'].getFeatures()
-        attributeList = sorted([abs(element[stockValue]) for element in features], reverse=True)
+        attributeList = sorted([abs(element[stockValue]) for element in features if element[stockValue] != None], reverse=True)
+        feedback.pushInfo(self.tr('     AttributeList'.format(attributeList)))
         val1 = attributeList[0]
         if attributeList[1] <= val1 / 3 :
             val2 = attributeList[1]
@@ -216,7 +217,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                         },
                         feedback = feedback)
 
-        radiusFormula = '2*sqrt(abs({0})*{1}/(7*pi()*{2}))'.format(stockValue, layerArea, summary['SUM'])
+        radiusFormula = '2*sqrt(abs("{0}")*{1}/(7*pi()*{2}))'.format(stockValue, layerArea, summary['SUM'])
         
         # Check if variable names VAL, R and VARIABLE exist in attribute list - if TRUE then increment
         fieldList = [field.name() for field in source.fields()]    
@@ -485,7 +486,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)
         
         features = source.getFeatures()
-        attributeList = sorted([abs(element[stockValue]) for element in features], reverse=True)
+        attributeList = sorted([abs(element[stockValue]) for element in features if element[stockValue] != None], reverse=True)
         val1 = attributeList[0]
         if attributeList[1] <= val1 / 3 :
             val2 = attributeList[1]
@@ -499,7 +500,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         maxRadius = self.parameterAsInt(parameters,self.MAX_RADIUS,context)
         maxValue = self.parameterAsInt(parameters,self.MAX_VALUE,context)        
 
-        radiusFormula = '{0} * sqrt(abs({1})/{2})'.format(maxRadius,stockValue,maxValue)
+        radiusFormula = '{0} * sqrt(abs("{1}")/{2})'.format(maxRadius,stockValue,maxValue)
         feedback.pushInfo(self.tr("formule du rayon : {0}".format(radiusFormula)))            
         fieldList = [field.name() for field in source.fields()]    
         
