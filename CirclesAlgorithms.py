@@ -49,7 +49,7 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterFeatureSource,
                        QgsProcessingParameterString,
                        QgsProcessingParameterFeatureSink)
-import processing 
+import processing , math
 
 # defaultMaxValue = 0
 # defaultMaxRadius = 0
@@ -81,7 +81,6 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
     COLUMN = 'COLUMN'
     SHAPE = 'SHAPE'
     METHOD = 'METHOD'
-    EXTENDED_ANALYSIS = 'EXTENDED ANALYSIS'
     LEGEND = 'LEGEND'
 
     def initAlgorithm(self, config):
@@ -134,7 +133,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterBoolean(self.LEGEND,
                 self.tr('Add an automatic legend layer'),
-                defaultValue=False))
+                defaultValue=True))
                 
             
         # We add a feature sink in which to store our processed features (this
@@ -216,7 +215,9 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                             'FIELD_NAME':stockValue
                         },
                         feedback = feedback)
-
+        somme = summary['SUM']
+        
+        maxRadius0 = 2*math.sqrt(abs(val1)*layerArea/(7*math.pi*somme))
         radiusFormula = '2*sqrt(abs("{0}")*{1}/(7*pi()*{2}))'.format(stockValue, layerArea, summary['SUM'])
         
         # Check if variable names VAL, R and VARIABLE exist in attribute list - if TRUE then increment
@@ -291,13 +292,13 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
 
         feedback.pushInfo('____________________')
         feedback.pushInfo('')
-        feedback.pushInfo(self.tr('   Analyse en ronds étendue'))        
+        feedback.pushInfo(self.tr('   Analyse en ronds'))        
         feedback.pushInfo(self.tr("     • Valeur représentée : {0}".format(stockValue)))
         # feedback.pushInfo('Analyse étendue : {0} '.format(extendedAnalysis))
         feedback.pushInfo('')
         feedback.pushInfo(self.tr('   Échelle'))
         feedback.pushInfo(self.tr('     • Val_Max : {0}'.format(val1))) 
-        feedback.pushInfo(self.tr('     • R_Max : {0}'.format('????')))        
+        feedback.pushInfo(self.tr('     • R_Max : {0}'.format(maxRadius0)))        
         feedback.pushInfo('')
         feedback.pushInfo(self.tr('   Valeurs représentées dans l\'échelle'))        
         feedback.pushInfo("     • val1 : {0}".format(val1))
