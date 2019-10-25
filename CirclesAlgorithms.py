@@ -48,8 +48,20 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterEnum,
                        QgsProcessingParameterFeatureSource,
                        QgsProcessingParameterString,
-                       QgsProcessingParameterFeatureSink)
+                       QgsProcessingParameterFeatureSink,
+                       QgsVectorLayer,
+                       QgsField,
+                       QgsFeature,
+                       QgsGeometry,
+                       QgsPointXY,
+                       QgsProject,
+                       QgsVectorFileWriter)
+from qgis.utils import iface
 import processing , math
+from qgis.PyQt.QtGui import *
+from qgis.PyQt.QtWidgets import *
+# import tempfile
+# import re
 
 # defaultMaxValue = 0
 # defaultMaxRadius = 0
@@ -82,7 +94,8 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
     SHAPE = 'SHAPE'
     METHOD = 'METHOD'
     LEGEND = 'LEGEND'
-
+    OUTPUT2 = 'OUTPUT2'
+    
     def initAlgorithm(self, config):
         """
         Here we define the inputs and output of the algorithm, along
@@ -129,12 +142,12 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                 optional=False
             )
         )        
-
+        """
         self.addParameter(
             QgsProcessingParameterBoolean(self.LEGEND,
                 self.tr('Add an automatic legend layer'),
                 defaultValue=True))
-                
+        """        
             
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
@@ -145,6 +158,14 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                 self.tr("Output layer")
             )
         )
+
+        self.addParameter(
+            QgsProcessingParameterVectorDestination(
+                self.OUTPUT2,
+                self.tr("Legend layer")
+            )
+        )
+        
 
     def processAlgorithm(self, parameters, context, feedback):
         """
@@ -158,6 +179,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         stockValue = self.parameterAsString(parameters, self.COLUMN , context)  
         analysisLayer = self.parameterAsSource(parameters, self.ANALYSIS_LAYER, context)        
         OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)       
+        OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context) 
         
         """
         sqlQuerry = 'select * from input1 order by {0} DESC'.format(stockValue)
@@ -250,15 +272,15 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         # crs = source2.crs().authid()
 
         # Type of symbols
-        represetation = self.parameterAsInt( parameters, self.SHAPE, context )
+        representation = self.parameterAsInt( parameters, self.SHAPE, context )
         if self.parameterAsInt( parameters, self.SHAPE, context ) == 0:
             # circles
-            representation = 2
+            representation0 = 2
         elif self.parameterAsInt( parameters, self.SHAPE, context ) == 1:
-            representation = 1
+            representation0 = 1
         else:
             # squares
-            representation = 0
+            representation0 = 0
             
         centroid = processing.run("native:centroids", 
                         {'INPUT':radiusAttribute['OUTPUT'],
@@ -282,7 +304,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         
         result = processing.run("qgis:rectanglesovalsdiamondsvariable",
                         {'INPUT': centroid['OUTPUT'],
-                         'SHAPE':representation,
+                         'SHAPE':representation0,
                          'WIDTH':radiusName,
                          'HEIGHT':radiusName,
                          'ROTATION':None,
@@ -297,22 +319,26 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         # feedback.pushInfo('Analyse étendue : {0} '.format(extendedAnalysis))
         feedback.pushInfo('')
         feedback.pushInfo(self.tr('   Échelle'))
-        feedback.pushInfo(self.tr('     • Val_Max : {0}'.format(val1))) 
-        feedback.pushInfo(self.tr('     • R_Max : {0}'.format(maxRadius0)))        
+        feedback.pushInfo(self.tr('     • Valeur max : {0}'.format(val1))) 
+        feedback.pushInfo(self.tr('     • Rayon max : {0}'.format(maxRadius0)))        
         feedback.pushInfo('')
-        feedback.pushInfo(self.tr('   Valeurs représentées dans l\'échelle'))        
+        feedback.pushInfo(self.tr('   Valeurs automatiques de l\'échelle'))        
         feedback.pushInfo("     • val1 : {0}".format(val1))
         feedback.pushInfo("     • val2 : {0}".format(val2))
         feedback.pushInfo("     • val3 : {0}".format(val3))        
+        feedback.pushInfo(" sortie : {0}".format(centroid['OUTPUT']))
         feedback.pushInfo('____________________')
-        feedback.pushInfo('')  
+        legendCoords = str(source.sourceExtent().xMaximum()+maxRadius0)+','+str((source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2)
         
+        feedback.pushInfo(" Coordonnées de la légende : {0}".format(legendCoords))
+        feedback.pushInfo('') 
+        result2 = processing.run("thematic:createcircleslegend", {'SHAPE':representation,'MAX_VALUE':val1,'MAX_RADIUS':maxRadius0,'VALUES_LIST':'','XY_LEGEND':legendCoords,'OUTPUT':OUTPUT2},feedback = feedback)                                  
         global defaultMaxValue
         global defaultMaxRadius
         defaultMaxValue = 100
         defaultMaxRadius = 100
         
-        return {self.OUTPUT: 'OUTPUT'}
+        return {self.OUTPUT: 'OUTPUT', self.OUTPUT2: 'OUTPUT2'}
         
 
     def name(self):
@@ -396,7 +422,8 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
     SHAPE = 'SHAPE'
     METHOD = 'METHOD'
     LEGEND = 'LEGEND'
-
+    OUTPUT2 = 'OUTPUT2'
+    
     def initAlgorithm(self, config):
         """
         Here we define the inputs and output of the algorithm, along
@@ -456,10 +483,6 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
-        self.addParameter(
-            QgsProcessingParameterBoolean(self.LEGEND,
-                self.tr('Add an automatic legend layer'),
-                defaultValue=False))
                 
             
         # We add a feature sink in which to store our processed features (this
@@ -471,7 +494,12 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
                 self.tr("Output layer")
             )
         )
-
+        self.addParameter(
+            QgsProcessingParameterVectorDestination(
+                self.OUTPUT2,
+                self.tr("Legend layer")
+            )
+        )
     def processAlgorithm(self, parameters, context, feedback):
         """
         Here is where the processing itself takes place.
@@ -485,6 +513,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         stockValue = self.parameterAsString(parameters, self.COLUMN , context)  
 
         OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)
+        OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context) 
         
         features = source.getFeatures()
         attributeList = sorted([abs(element[stockValue]) for element in features if element[stockValue] != None], reverse=True)
@@ -531,7 +560,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
                           feedback=feedback)
        
         # Type of symbols
-        represetation = self.parameterAsInt( parameters, self.SHAPE, context )
+        representation0 = self.parameterAsInt( parameters, self.SHAPE, context )
         if self.parameterAsInt( parameters, self.SHAPE, context ) == 0:
             # circles
             representation = 2
@@ -572,8 +601,12 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo("     • val3 : {0}".format(val3))        
         feedback.pushInfo('____________________')
         feedback.pushInfo('')  
+        legendCoords = str(source.sourceExtent().xMaximum()+maxRadius)+','+str((source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2)
         
-        return {self.OUTPUT: 'OUTPUT'}
+        feedback.pushInfo(" Coordonnées de la légende : {0}".format(legendCoords))
+        feedback.pushInfo('') 
+        result2 = processing.run("thematic:createcircleslegend", {'SHAPE':representation0,'MAX_VALUE':maxValue,'MAX_RADIUS':maxRadius,'VALUES_LIST':'','XY_LEGEND':legendCoords,'OUTPUT':OUTPUT2},feedback = feedback)         
+        return {self.OUTPUT: 'OUTPUT', self.OUTPUT2: 'OUTPUT2'}
         
 
     def name(self):
@@ -654,8 +687,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
     MAX_RADIUS = 'MAX_RADIUS'
     MAX_VALUE = 'MAX_VALUE'
     VALUES_LIST = 'VALUES_LIST'
-    X_LEGEND = 'X_LEGEND'
-    Y_LEGEND = 'Y_LEGEND'
+    XY_LEGEND = 'XY_LEGEND'
     SHAPE = 'SHAPE'
     
     def initAlgorithm(self, config):
@@ -664,7 +696,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         with some other properties.
         """
         
-        self.shapes = [self.tr('Circles'), self.tr('Squares')]
+        self.shapes = [self.tr('Circles'), self.tr('Diamons'), self.tr('Squares')]
         self.addParameter(QgsProcessingParameterEnum(
                 self.SHAPE,
                 self.tr('Type of representation'),
@@ -699,66 +731,119 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
             )
         )
         
+
         params = []
-        params.append(
-            QgsProcessingParameterNumber(
-                self.X_LEGEND,
-                self.tr('X position of the legend'),
-                minValue=0,
-                optional=True
-            )
-        )
         
         params.append(
-            QgsProcessingParameterNumber(
-                self.Y_LEGEND,
-                self.tr('Y position of the legend'),
-                minValue=0,
+            QgsProcessingParameterString(
+                self.XY_LEGEND,
+                self.tr('Position of the legend X,Y'),
                 optional=True
             )
         )
         
         for param in params:
-            param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
+            param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagHidden)
             self.addParameter(param)
+
             
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
         # algorithm is run in QGIS).
         self.addParameter(
-            QgsProcessingParameterFeatureSink(
+            QgsProcessingParameterVectorDestination(
                 self.OUTPUT,
-                self.tr('Output layer')
+                self.tr("Output layer")
             )
         )
-
+        
     def processAlgorithm(self, parameters, context, feedback):
         """
         Here is where the processing itself takes place.
         """
+        
+        OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)  
+        
+        # Type of symbols
+        represetation = self.parameterAsInt( parameters, self.SHAPE, context )
+        if self.parameterAsInt( parameters, self.SHAPE, context ) == 0:
+            # circles
+            representation = 2
+        elif self.parameterAsInt( parameters, self.SHAPE, context ) == 1:
+            representation = 1
+        else:
+            # squares
+            representation = 0
+        feedback.pushInfo('____________________')
+        feedback.pushInfo('')
+        feedback.pushInfo(self.tr("     Échelle des ronds :"))
+        
+        maxRadius = self.parameterAsInt(parameters,self.MAX_RADIUS,context)
+        maxValue = self.parameterAsInt(parameters,self.MAX_VALUE,context)  
+        feedback.pushInfo(self.tr('     • Valeur max : {0}'.format(maxValue)))   
+        feedback.pushInfo(self.tr('     • Rayon max : {0}'.format(maxRadius)))           
+        valueList = self.parameterAsString(parameters, self.VALUES_LIST , context)
+        legendCustomValues = valueList.strip().replace(';',' ').split()
+        coordsLegendText = self.parameterAsString(parameters, self.XY_LEGEND , context)
+   
+        feedback.pushInfo('')    
+        feedback.pushInfo(self.tr('     • Liste des valeurs à afficher : {0}'.format(legendCustomValues)))       
+        
+        if len(coordsLegendText) >0 :
+            legendCoordsList = coordsLegendText.strip().split(',')
+            coordsLegend =[float(item) for item in legendCoordsList ]
+            xLegend = coordsLegend[0]
+            yLegend = coordsLegend[1]            
+        else:
+            canevasExtent = iface.mapCanvas().extent()
+            xLegend = (canevasExtent.xMaximum()+canevasExtent.xMinimum() )/2
+            yLegend = (canevasExtent.yMaximum()+canevasExtent.yMinimum() )/2
+        feedback.pushInfo(self.tr('     • Position de la légende : {0} , {1}'.format(xLegend,yLegend)))  
 
-        # Retrieve the feature source and sink. The 'dest_id' variable is used
-        # to uniquely identify the feature sink, and must be included in the
-        # dictionary returned by the processAlgorithm function.
-        source = self.parameterAsSource(parameters, self.INPUT, context)
-        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT,
-                context, source.fields(), source.wkbType(), source.sourceCrs())
+        coeff = maxRadius * (math.pi/maxValue)**.5
+        Value = maxValue
+        # radius = coeff * (Value/math.pi) ** .5
+        # dirpath = tempfile.mkdtemp()
+        # sortie = str(re.sub('\\\\','/',dirpath) + "/output.shp")
+        # feedback.pushInfo(self.tr('     fichier : {0}'.format(sortie)))          
+        vl = QgsVectorLayer("Point?crs=epsg:2154", "temp", 'memory')
+        from qgis.PyQt.QtCore import QVariant
+        pr = vl.dataProvider()
+        pr.addAttributes([QgsField("VAL", QVariant.Double),
+                          QgsField("R",  QVariant.Double),
+                          QgsField("SECT", QVariant.String)])
+        vl.updateFields() 
+        if len(legendCustomValues) == 0:
+            legendCustomValues = (maxValue,maxValue/3,maxValue/9)
+        else:
+            legendCustomValues = sorted(legendCustomValues, reverse= True)
+            legendCustomValues =[float(item) for item in legendCustomValues ]
+        for i in legendCustomValues:
+            radius = coeff * (i/math.pi) ** .5
+            f = QgsFeature()
+            if representation == 0:
+                x = xLegend+maxRadius/2-radius/2
+            else :
+                x = xLegend
+            y = yLegend-maxRadius/2+radius/2
+            f.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(x,y)))
+            f.setAttributes([i, radius, "texte"])
+            pr.addFeature(f)
+        vl.updateExtents() 
+        # QgsProject.instance().addMapLayer(vl)
+        # QgsVectorFileWriter.writeAsVectorFormat(vl, sortie, "utf8", vl.crs(), "ESRI Shapefile")        
+        # processing.run("qgis:rectanglesovalsdiamondsvariable", {'INPUT':'D:/temp/pointsPop.shp','SHAPE':2,'WIDTH':'size','HEIGHT':'size','ROTATION':None,'SEGMENTS':36,'OUTPUT':'memory:'})
+        #  C:/Users/KEN5BC/AppData/Local/Temp/tmp08rq2a1k/output.shp
+        result = processing.run("qgis:rectanglesovalsdiamondsvariable",
+                        {'INPUT': vl,
+                         'SHAPE':representation,
+                         'WIDTH': 'R',
+                         'HEIGHT': 'R',
+                         'ROTATION':None,
+                         'SEGMENTS':36,
+                         'OUTPUT':OUTPUT},
+                          feedback = feedback)
 
-        # Compute the number of steps to display within the progress bar and
-        # get features from source
-        total = 100.0 / source.featureCount() if source.featureCount() else 0
-        features = source.getFeatures()
-
-        for current, feature in enumerate(features):
-            # Stop the algorithm if cancel button has been clicked
-            if feedback.isCanceled():
-                break
-
-            # Add a feature in the sink
-            sink.addFeature(feature, QgsFeatureSink.FastInsert)
-
-            # Update the progress bar
-            feedback.setProgress(int(current * total))
 
         # Return the results of the algorithm. In this case our only result is
         # the feature sink which contains the processed features, but some
@@ -766,7 +851,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         # statistics, etc. These should all be included in the returned
         # dictionary, with keys matching the feature corresponding parameter
         # or output names.
-        return {self.OUTPUT: dest_id}
+        return {self.OUTPUT: 'OUTPUT'}
 
     def shortHelpString(self):
         return self.tr("Légende pour les analyses en ronds.\n \n \
@@ -796,7 +881,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('Generate legend for proportional circles >>> COMING SOON !...')
+        return self.tr('Generate legend for proportional circles')
 
     def group(self):
         """

@@ -451,7 +451,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         )
         
         self.extentList = [ 'Métropole - ETRS-LAEA - EPSG:3035', 
-                            'Guadeloupe et Martinique - UTM 20N - EPSG:2973',
+                            'Guadeloupe et Martinique - UTM 20N - EPSG:5490',
                             'La Réunion - UTM 40S - EPSG:2975', 
                             'Guyane - UTM 22N - EPSG:2972', 
                             'Mayotte - UTM 38S - EPSG:4471', 
@@ -509,7 +509,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         crs = source2.crs().authid()
         extentZone = str(self.parameterAsString(parameters, self.EXTENT , context))
         
-        crsList = {"0": "3035", "1": "2973", "2":"2975", "3":"2972", "4":"4471", "5":"4467", "6":"4467"}
+        crsList = {"0": "3035", "1": "5490", "2":"2975", "3":"2972", "4":"4471", "5":"4467", "6":"4467"}
         crsCode = crsList[extentZone]
         # QgsMessageLog.logMessage("crs zone : {0}".format(crsCode), 'Thematic Plugin', 0)
         feedback.pushInfo(self.tr("Zone EPSG:{0}".format(crsCode)))
@@ -565,7 +565,15 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         result1 = processing.run("native:saveselectedfeatures", 
             {'INPUT':grille['OUTPUT'],
             'OUTPUT':'memory:'})
-        refactorfieldsExpression = "'CRS" + crsCode + "RES"+ str(CELL_SIZE) + "mN'" + ' + to_string("left") + ' + "'E'" + ' + to_string("bottom")' 
+        refactorfieldsExpression = "'CRS" + crsCode + "RES"+ str(CELL_SIZE) + "mN'" + ' + to_string("bottom") + ' + "'E'" + ' + to_string("left")' 
+        refactorfieldsExpression_1k = "'CRS" + crsCode + "RES"+ str('1000') + "mN'" + ' + to_string(1000*to_int(floor("bottom"/1000))) + ' + "'E'" + ' + to_string(1000*to_int(floor("left"/1000)))' 
+        refactorfieldsExpression_2k = "'CRS" + crsCode + "RES"+ str('2000') + "mN'" + ' + to_string(2000*floor("bottom"/2000)) + ' + "'E'" + ' + to_string(2000*floor("left"/2000))' 
+        refactorfieldsExpression_4k = "'CRS" + crsCode + "RES"+ str('4000') + "mN'" + ' + to_string(4000*floor("bottom"/4000)) + ' + "'E'" + ' + to_string(4000*floor("left"/4000))' 
+        refactorfieldsExpression_8k = "'CRS" + crsCode + "RES"+ str('8000') + "mN'" + ' + to_string(8000*floor("bottom"/8000)) + ' + "'E'" + ' + to_string(8000*floor("left"/8000))' 
+        refactorfieldsExpression_16k = "'CRS" + crsCode + "RES"+ str('16000') + "mN'" + ' + to_string(16000*floor("bottom"/16000)) + ' + "'E'" + ' + to_string(16000*floor("left"/16000))' 
+        refactorfieldsExpression_32k = "'CRS" + crsCode + "RES"+ str('32000') + "mN'" + ' + to_string(32000*floor("bottom"/32000)) + ' + "'E'" + ' + to_string(32000*floor("left"/32000))' 
+
+		
         # QgsMessageLog.logMessage("expression : {0}".format(refactorfieldsExpression), 'Thematic Plugin', 0)
         # Ajout des colonnes ID, x et y
         feedback.pushInfo(self.tr("Ajout des identifiants des carreaux"))
@@ -575,17 +583,12 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
                                  'length': 30, 
                                  'name': 'idINSPIRE', 
                                  'precision': 0, 
-                                 'type': 10}, 
-                             {'expression': 'left',
-                                 'length': 24, 
-                                 'name': 'x', 
+                                 'type': 10},
+								 {'expression': refactorfieldsExpression_1k, 
+                                 'length': 31, 
+                                 'name': 'id_carr_1km', 
                                  'precision': 0, 
-                                 'type': 2}, 
-                             {'expression': 'bottom', 
-                                 'length': 24, 
-                                 'name': 'y', 
-                                 'precision': 0, 
-                                 'type': 2}],
+                                 'type': 10}],
                          'OUTPUT':OUTPUT_LAYER},
                          feedback=feedback)
         # QgsMessageLog.logMessage("result : {0}".format(result2['OUTPUT']), 'Thematic Plugin', 0)                         
