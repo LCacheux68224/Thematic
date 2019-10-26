@@ -318,32 +318,36 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
 
         feedback.pushInfo('____________________')
         feedback.pushInfo('')
-        feedback.pushInfo(self.tr('   Analyse en ronds'))        
-        feedback.pushInfo(self.tr("     • Valeur représentée : {0}".format(stockValue)))
-        # feedback.pushInfo('Analyse étendue : {0} '.format(extendedAnalysis))
-        
-
+        feedback.pushInfo(self.tr("    Analyse en symboles proportionnels"))
+        feedback.pushInfo('') 
+        feedback.pushInfo(self.tr("     • Variable analysée : {0}".format(stockValue)))
         feedback.pushInfo('')
-        feedback.pushInfo(self.tr('   Échelle'))
-        feedback.pushInfo(self.tr('     • Valeur max : {0}'.format(val1))) 
-        feedback.pushInfo(self.tr('     • Rayon max : {0}'.format(maxRadius0)))     
-
+        feedback.pushInfo(self.tr('   Échelle automatique :'))   
+        feedback.pushInfo("      • Val :  {0}".format(val1))
+        feedback.pushInfo("      • R :    {0}".format(maxRadius0))  
         if automaticLegend:       
             OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context) 
-            feedback.pushInfo('')
-            feedback.pushInfo(self.tr('   Valeurs automatiques de l\'échelle'))        
+            xLegend = source.sourceExtent().xMaximum()+maxRadius0
+            yLegend = (source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2
+            legendCoords = str(xLegend)+','+str(yLegend)
+            result2 = processing.run("thematic:createcircleslegend", 
+                        {'SHAPE':representation,
+                        'MAX_VALUE':val1,
+                        'MAX_RADIUS':maxRadius0,
+                        'VALUES_LIST':'',
+                        'XY_LEGEND':legendCoords,
+                        'OUTPUT':OUTPUT2},
+                        feedback = None)    
+            feedback.pushInfo(self.tr('    Valeurs représentées dans la légende :'))
             feedback.pushInfo("     • val1 : {0}".format(val1))
             feedback.pushInfo("     • val2 : {0}".format(val2))
-            feedback.pushInfo("     • val3 : {0}".format(val3))        
-            feedback.pushInfo(" sortie : {0}".format(centroid['OUTPUT']))
+            feedback.pushInfo("     • val3 : {0}".format(val3)) 
+            feedback.pushInfo(self.tr('    Coordonnées de la légende :'))             
+            feedback.pushInfo("      • X :    {0}".format(xLegend))
+            feedback.pushInfo("      • Y :    {0}".format(yLegend))              
             feedback.pushInfo('____________________')
-            
-            legendCoords = str(source.sourceExtent().xMaximum()+maxRadius0)+','+str((source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2)
-            
-            feedback.pushInfo(" Coordonnées de la légende : {0}".format(legendCoords))
-            feedback.pushInfo('') 
-            result2 = processing.run("thematic:createcircleslegend", {'SHAPE':representation,'MAX_VALUE':val1,'MAX_RADIUS':maxRadius0,'VALUES_LIST':'','XY_LEGEND':legendCoords,'OUTPUT':OUTPUT2},feedback = feedback)       
-            feedback.pushInfo("     légende automatique : {0}".format(automaticLegend))           
+            feedback.pushInfo('')             
+   
             global defaultMaxValue
             global defaultMaxRadius
             defaultMaxValue = 100
@@ -351,7 +355,9 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
             
             return {self.OUTPUT: 'OUTPUT', self.OUTPUT2: 'OUTPUT2'}            
         else:
-            feedback.pushInfo(self.tr('   Légende non générée'))               
+            feedback.pushInfo(self.tr('   Légende non demandée'))   
+            feedback.pushInfo('____________________')
+            feedback.pushInfo('')               
             return {self.OUTPUT: 'OUTPUT'}
         
 
@@ -606,30 +612,42 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
                           feedback = feedback)
 
         feedback.pushInfo('____________________')
+        feedback.pushInfo('')       
+        feedback.pushInfo(self.tr("    Analyse en symboles proportionnels"))
+        feedback.pushInfo('')           
+        feedback.pushInfo(self.tr("    Variable analysée : {0}".format(stockValue)))
         feedback.pushInfo('')
-        feedback.pushInfo(self.tr("     • Valeur représentée : {0}".format(stockValue)))
-        # feedback.pushInfo('Analyse étendue : {0} '.format(extendedAnalysis))
-        feedback.pushInfo('')
+        feedback.pushInfo(self.tr('    Échelle personnalisée :'))  
+        feedback.pushInfo("      • Val :  {0}".format(maxValue))
+        feedback.pushInfo("      • R :    {0}".format(maxRadius))                    
         if automaticLegend:       
-            OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context)         
-            feedback.pushInfo(self.tr('   Échelle automatique'))
-            feedback.pushInfo(self.tr('     • Val_Max : {0}'.format(val1))) 
-            feedback.pushInfo(self.tr('     • R_Max : {0}'.format('????')))        
-            feedback.pushInfo('')
-            feedback.pushInfo(self.tr('   Valeurs représentées dans l\'échelle'))        
-            feedback.pushInfo("     • val1 : {0}".format(val1))
-            feedback.pushInfo("     • val2 : {0}".format(val2))
-            feedback.pushInfo("     • val3 : {0}".format(val3))        
-            feedback.pushInfo('____________________')
-            feedback.pushInfo('')  
-            legendCoords = str(source.sourceExtent().xMaximum()+maxRadius)+','+str((source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2)
-            
-            feedback.pushInfo(" Coordonnées de la légende : {0}".format(legendCoords))
+            OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context)
+            xLegend = source.sourceExtent().xMaximum()+maxRadius
+            yLegend = (source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2
+            legendCoords = str(xLegend)+','+str(yLegend)           
+            result2 = processing.run("thematic:createcircleslegend", 
+                        {'SHAPE':representation0,
+                         'MAX_VALUE':maxValue,
+                         'MAX_RADIUS':maxRadius,
+                         'VALUES_LIST':'',
+                         'XY_LEGEND':legendCoords,
+                         'OUTPUT':OUTPUT2},
+                         feedback = None)
+                         
+            feedback.pushInfo(self.tr('    Valeurs automatiques représentées dans la légende :'))
+            feedback.pushInfo("      • val1 : {0}".format(val1))
+            feedback.pushInfo("      • val2 : {0}".format(val2))
+            feedback.pushInfo("      • val3 : {0}".format(val3))        
+            feedback.pushInfo(self.tr('    Coordonnées de la légende :'))             
+            feedback.pushInfo("      • X :    {0}".format(xLegend))
+            feedback.pushInfo("      • Y :    {0}".format(yLegend))  
+            feedback.pushInfo('____________________')            
             feedback.pushInfo('') 
-            result2 = processing.run("thematic:createcircleslegend", {'SHAPE':representation0,'MAX_VALUE':maxValue,'MAX_RADIUS':maxRadius,'VALUES_LIST':'','XY_LEGEND':legendCoords,'OUTPUT':OUTPUT2},feedback = feedback)         
             return {self.OUTPUT: 'OUTPUT', self.OUTPUT2: 'OUTPUT2'}
         else:
-            feedback.pushInfo(self.tr('   Légende non générée'))               
+            feedback.pushInfo(self.tr('   Légende non demandée'))    
+            feedback.pushInfo('____________________')            
+            feedback.pushInfo('')             
             return {self.OUTPUT: 'OUTPUT'}        
 
     def name(self):
