@@ -225,7 +225,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                      
         features = selectedPoints['OUTPUT'].getFeatures()
         attributeList = sorted([abs(element[stockValue]) for element in features if element[stockValue] != None], reverse=True)
-        feedback.pushInfo(self.tr('     AttributeList'.format(attributeList)))
+        # feedback.pushInfo(self.tr('     AttributeList'.format(len(attributeList))))
         val1 = attributeList[0]
         if attributeList[1] <= val1 / 3 :
             val2 = attributeList[1]
@@ -815,20 +815,21 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         else:
             # squares
             representation = 0
-        feedback.pushInfo('____________________')
-        feedback.pushInfo('')
-        feedback.pushInfo(self.tr("     Échelle des ronds :"))
-        
+
         maxRadius = self.parameterAsInt(parameters,self.MAX_RADIUS,context)
         maxValue = self.parameterAsInt(parameters,self.MAX_VALUE,context)  
-        feedback.pushInfo(self.tr('     • Valeur max : {0}'.format(maxValue)))   
-        feedback.pushInfo(self.tr('     • Rayon max : {0}'.format(maxRadius)))           
         valueList = self.parameterAsString(parameters, self.VALUES_LIST , context)
         legendCustomValues = valueList.strip().replace(';',' ').split()
         coordsLegendText = self.parameterAsString(parameters, self.XY_LEGEND , context)
-   
+        
+        feedback.pushInfo('____________________')
+        feedback.pushInfo('')
+        feedback.pushInfo(self.tr("     Échelle des symboles proportionnels :"))
         feedback.pushInfo('')    
-        feedback.pushInfo(self.tr('     • Liste des valeurs à afficher : {0}'.format(legendCustomValues)))       
+        feedback.pushInfo(self.tr('     • Val : {0}'.format(maxValue)))   
+        feedback.pushInfo(self.tr('     • R : {0}'.format(maxRadius)))              
+        feedback.pushInfo('')    
+     
         
         if len(coordsLegendText) >0 :
             legendCoordsList = coordsLegendText.strip().split(',')
@@ -839,7 +840,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
             canevasExtent = iface.mapCanvas().extent()
             xLegend = (canevasExtent.xMaximum()+canevasExtent.xMinimum() )/2
             yLegend = (canevasExtent.yMaximum()+canevasExtent.yMinimum() )/2
-        feedback.pushInfo(self.tr('     • Position de la légende : {0} , {1}'.format(xLegend,yLegend)))  
+  
 
         coeff = maxRadius * (math.pi/maxValue)**.5
         Value = maxValue
@@ -871,10 +872,15 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
             f.setAttributes([i, radius, "texte"])
             pr.addFeature(f)
         vl.updateExtents() 
-        # QgsProject.instance().addMapLayer(vl)
-        # QgsVectorFileWriter.writeAsVectorFormat(vl, sortie, "utf8", vl.crs(), "ESRI Shapefile")        
-        # processing.run("qgis:rectanglesovalsdiamondsvariable", {'INPUT':'D:/temp/pointsPop.shp','SHAPE':2,'WIDTH':'size','HEIGHT':'size','ROTATION':None,'SEGMENTS':36,'OUTPUT':'memory:'})
-        #  C:/Users/KEN5BC/AppData/Local/Temp/tmp08rq2a1k/output.shp
+        
+        feedback.pushInfo(self.tr('     • Liste des valeurs à afficher : {0}'.format(legendCustomValues))) 
+        feedback.pushInfo('')  
+        feedback.pushInfo(self.tr('    Coordonnées de la légende :'))             
+        feedback.pushInfo("      • X :    {0}".format(xLegend))
+        feedback.pushInfo("      • Y :    {0}".format(yLegend))  
+        feedback.pushInfo('____________________')            
+        feedback.pushInfo('')   
+        
         result = processing.run("qgis:rectanglesovalsdiamondsvariable",
                         {'INPUT': vl,
                          'SHAPE':representation,
@@ -899,12 +905,11 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
                        <h3>Échelle des ronds</h3> \n \
                        L'échelle des ronds est défini par une valeur (généralement le maximum) associé au rayon correspondant \n \
                        <h3>Les valeurs à représenter</h4> \n \
-                       Par défaut l'extension représente les valeurs MAX, MAX//3 ET MAX//9\n \
+                       Par défaut l'extension représente les valeurs \n -> MAX, MAX/3 et MAX/9\n \
                        Il est possible de personnaliser l'échelle en indiquant les valeurs que \
                        l'on souhaite représenter en les saisissant de cette manière :\n \
-                       100000;15000;5000 \n\n \
-                       Les paramètres avancés permettent de placer la légende en un point (X,Y) de manière précise\n\
-                       Par défaut la légende se place au centre de l'écran")
+                       -> 100000;15000;5000 \n\n \
+                       La légende se place automatiquement au centre de du canevas")
 
                        
     def name(self):
