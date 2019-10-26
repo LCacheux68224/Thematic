@@ -49,6 +49,7 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterFeatureSource,
                        QgsProcessingParameterString,
                        QgsProcessingParameterFeatureSink,
+                       QgsProcessingParameterBoolean,
                        QgsVectorLayer,
                        QgsField,
                        QgsFeature,
@@ -142,23 +143,25 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                 optional=False
             )
         )        
-        """
+        
         self.addParameter(
             QgsProcessingParameterBoolean(self.LEGEND,
                 self.tr('Add an automatic legend layer'),
                 defaultValue=True))
-        """        
+                
             
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
         # algorithm is run in QGIS).
+        
         self.addParameter(
             QgsProcessingParameterVectorDestination(
                 self.OUTPUT,
                 self.tr("Output layer")
             )
         )
-
+        
+                                                            
         self.addParameter(
             QgsProcessingParameterVectorDestination(
                 self.OUTPUT2,
@@ -179,8 +182,9 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         stockValue = self.parameterAsString(parameters, self.COLUMN , context)  
         analysisLayer = self.parameterAsSource(parameters, self.ANALYSIS_LAYER, context)        
         OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)       
-        OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context) 
-        
+        # OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context) 
+        automaticLegend = self.parameterAsBool(parameters,self.LEGEND,context)
+   
         """
         sqlQuerry = 'select * from input1 order by {0} DESC'.format(stockValue)
         source = processing.run("qgis:executesql",
@@ -317,28 +321,38 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(self.tr('   Analyse en ronds'))        
         feedback.pushInfo(self.tr("     • Valeur représentée : {0}".format(stockValue)))
         # feedback.pushInfo('Analyse étendue : {0} '.format(extendedAnalysis))
+        
+
         feedback.pushInfo('')
         feedback.pushInfo(self.tr('   Échelle'))
         feedback.pushInfo(self.tr('     • Valeur max : {0}'.format(val1))) 
-        feedback.pushInfo(self.tr('     • Rayon max : {0}'.format(maxRadius0)))        
-        feedback.pushInfo('')
-        feedback.pushInfo(self.tr('   Valeurs automatiques de l\'échelle'))        
-        feedback.pushInfo("     • val1 : {0}".format(val1))
-        feedback.pushInfo("     • val2 : {0}".format(val2))
-        feedback.pushInfo("     • val3 : {0}".format(val3))        
-        feedback.pushInfo(" sortie : {0}".format(centroid['OUTPUT']))
-        feedback.pushInfo('____________________')
-        legendCoords = str(source.sourceExtent().xMaximum()+maxRadius0)+','+str((source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2)
-        
-        feedback.pushInfo(" Coordonnées de la légende : {0}".format(legendCoords))
-        feedback.pushInfo('') 
-        result2 = processing.run("thematic:createcircleslegend", {'SHAPE':representation,'MAX_VALUE':val1,'MAX_RADIUS':maxRadius0,'VALUES_LIST':'','XY_LEGEND':legendCoords,'OUTPUT':OUTPUT2},feedback = feedback)                                  
-        global defaultMaxValue
-        global defaultMaxRadius
-        defaultMaxValue = 100
-        defaultMaxRadius = 100
-        
-        return {self.OUTPUT: 'OUTPUT', self.OUTPUT2: 'OUTPUT2'}
+        feedback.pushInfo(self.tr('     • Rayon max : {0}'.format(maxRadius0)))     
+
+        if automaticLegend:       
+            OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context) 
+            feedback.pushInfo('')
+            feedback.pushInfo(self.tr('   Valeurs automatiques de l\'échelle'))        
+            feedback.pushInfo("     • val1 : {0}".format(val1))
+            feedback.pushInfo("     • val2 : {0}".format(val2))
+            feedback.pushInfo("     • val3 : {0}".format(val3))        
+            feedback.pushInfo(" sortie : {0}".format(centroid['OUTPUT']))
+            feedback.pushInfo('____________________')
+            
+            legendCoords = str(source.sourceExtent().xMaximum()+maxRadius0)+','+str((source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2)
+            
+            feedback.pushInfo(" Coordonnées de la légende : {0}".format(legendCoords))
+            feedback.pushInfo('') 
+            result2 = processing.run("thematic:createcircleslegend", {'SHAPE':representation,'MAX_VALUE':val1,'MAX_RADIUS':maxRadius0,'VALUES_LIST':'','XY_LEGEND':legendCoords,'OUTPUT':OUTPUT2},feedback = feedback)       
+            feedback.pushInfo("     légende automatique : {0}".format(automaticLegend))           
+            global defaultMaxValue
+            global defaultMaxRadius
+            defaultMaxValue = 100
+            defaultMaxRadius = 100
+            
+            return {self.OUTPUT: 'OUTPUT', self.OUTPUT2: 'OUTPUT2'}            
+        else:
+            feedback.pushInfo(self.tr('   Légende non générée'))               
+            return {self.OUTPUT: 'OUTPUT'}
         
 
     def name(self):
@@ -430,6 +444,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         with some other properties.
         """
 
+        
         self.oldMaxRadius = 0
         self.oldMaxValue = 0
             
@@ -483,7 +498,11 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
-                
+        
+        self.addParameter(
+            QgsProcessingParameterBoolean(self.LEGEND,
+                self.tr('Add an automatic legend layer'),
+                defaultValue=True))                
             
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
@@ -513,8 +532,8 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         stockValue = self.parameterAsString(parameters, self.COLUMN , context)  
 
         OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)
-        OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context) 
-        
+
+        automaticLegend = self.parameterAsBool(parameters,self.LEGEND,context)        
         features = source.getFeatures()
         attributeList = sorted([abs(element[stockValue]) for element in features if element[stockValue] != None], reverse=True)
         val1 = attributeList[0]
@@ -531,7 +550,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         maxValue = self.parameterAsInt(parameters,self.MAX_VALUE,context)        
 
         radiusFormula = '{0} * sqrt(abs("{1}")/{2})'.format(maxRadius,stockValue,maxValue)
-        feedback.pushInfo(self.tr("formule du rayon : {0}".format(radiusFormula)))            
+          
         fieldList = [field.name() for field in source.fields()]    
         
         valueName, radiusName, varName = 'VAL', 'R', 'VARIABLE'
@@ -591,23 +610,27 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(self.tr("     • Valeur représentée : {0}".format(stockValue)))
         # feedback.pushInfo('Analyse étendue : {0} '.format(extendedAnalysis))
         feedback.pushInfo('')
-        feedback.pushInfo(self.tr('   Échelle automatique'))
-        feedback.pushInfo(self.tr('     • Val_Max : {0}'.format(val1))) 
-        feedback.pushInfo(self.tr('     • R_Max : {0}'.format('????')))        
-        feedback.pushInfo('')
-        feedback.pushInfo(self.tr('   Valeurs représentées dans l\'échelle'))        
-        feedback.pushInfo("     • val1 : {0}".format(val1))
-        feedback.pushInfo("     • val2 : {0}".format(val2))
-        feedback.pushInfo("     • val3 : {0}".format(val3))        
-        feedback.pushInfo('____________________')
-        feedback.pushInfo('')  
-        legendCoords = str(source.sourceExtent().xMaximum()+maxRadius)+','+str((source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2)
-        
-        feedback.pushInfo(" Coordonnées de la légende : {0}".format(legendCoords))
-        feedback.pushInfo('') 
-        result2 = processing.run("thematic:createcircleslegend", {'SHAPE':representation0,'MAX_VALUE':maxValue,'MAX_RADIUS':maxRadius,'VALUES_LIST':'','XY_LEGEND':legendCoords,'OUTPUT':OUTPUT2},feedback = feedback)         
-        return {self.OUTPUT: 'OUTPUT', self.OUTPUT2: 'OUTPUT2'}
-        
+        if automaticLegend:       
+            OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context)         
+            feedback.pushInfo(self.tr('   Échelle automatique'))
+            feedback.pushInfo(self.tr('     • Val_Max : {0}'.format(val1))) 
+            feedback.pushInfo(self.tr('     • R_Max : {0}'.format('????')))        
+            feedback.pushInfo('')
+            feedback.pushInfo(self.tr('   Valeurs représentées dans l\'échelle'))        
+            feedback.pushInfo("     • val1 : {0}".format(val1))
+            feedback.pushInfo("     • val2 : {0}".format(val2))
+            feedback.pushInfo("     • val3 : {0}".format(val3))        
+            feedback.pushInfo('____________________')
+            feedback.pushInfo('')  
+            legendCoords = str(source.sourceExtent().xMaximum()+maxRadius)+','+str((source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2)
+            
+            feedback.pushInfo(" Coordonnées de la légende : {0}".format(legendCoords))
+            feedback.pushInfo('') 
+            result2 = processing.run("thematic:createcircleslegend", {'SHAPE':representation0,'MAX_VALUE':maxValue,'MAX_RADIUS':maxRadius,'VALUES_LIST':'','XY_LEGEND':legendCoords,'OUTPUT':OUTPUT2},feedback = feedback)         
+            return {self.OUTPUT: 'OUTPUT', self.OUTPUT2: 'OUTPUT2'}
+        else:
+            feedback.pushInfo(self.tr('   Légende non générée'))               
+            return {self.OUTPUT: 'OUTPUT'}        
 
     def name(self):
         """
