@@ -153,7 +153,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
         # algorithm is run in QGIS).
-        
+        """
         self.addParameter(
             QgsProcessingParameterVectorDestination(
                 self.OUTPUT,
@@ -168,8 +168,21 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                 self.tr("Legend layer")
             )
         )
-        
-
+        """
+        self.addParameter(
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT, 
+                self.tr('Output layer'), 
+                type=QgsProcessing.TypeVectorPolygon
+            )
+        ) 
+        self.addParameter(
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT2, 
+                self.tr('Legend layer'), 
+                type=QgsProcessing.TypeVectorPolygon
+            )
+        )         
     def processAlgorithm(self, parameters, context, feedback):
         """
         Here is where the processing itself takes place.
@@ -181,7 +194,8 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         source = self.parameterAsSource(parameters, self.INPUT, context).materialize(QgsFeatureRequest())
         stockValue = self.parameterAsString(parameters, self.COLUMN , context)  
         analysisLayer = self.parameterAsSource(parameters, self.ANALYSIS_LAYER, context)        
-        OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)       
+        # OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context) 
+   
         # OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context) 
         automaticLegend = self.parameterAsBool(parameters,self.LEGEND,context)
    
@@ -313,8 +327,16 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                          'HEIGHT':radiusName,
                          'ROTATION':None,
                          'SEGMENTS':36,
-                         'OUTPUT':OUTPUT},
+                         'OUTPUT':'memory:'},
                           feedback = feedback)
+                          
+        # Add features to the sink
+        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
+                                               result['OUTPUT'].fields(), QgsWkbTypes.Polygon, result['OUTPUT'].crs())        
+        features = result['OUTPUT'].getFeatures()
+        for feature in features:
+            sink.addFeature(feature, QgsFeatureSink.FastInsert)   
+            
 
         feedback.pushInfo('____________________')
         feedback.pushInfo('')
@@ -326,7 +348,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo("      • Val :  {0}".format(val1))
         feedback.pushInfo("      • R :    {0}".format(maxRadius0))  
         if automaticLegend:       
-            OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context) 
+            # OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context) 
             xLegend = source.sourceExtent().xMaximum()+maxRadius0
             yLegend = (source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2
             legendCoords = str(xLegend)+','+str(yLegend)
@@ -336,7 +358,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                         'MAX_RADIUS':maxRadius0,
                         'VALUES_LIST':'',
                         'XY_LEGEND':legendCoords,
-                        'OUTPUT':OUTPUT2},
+                        'OUTPUT':'memory:'},
                         feedback = None)    
             feedback.pushInfo(self.tr('    Valeurs représentées dans la légende :'))
             feedback.pushInfo("     • val1 : {0}".format(val1))
@@ -347,18 +369,22 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
             feedback.pushInfo("      • Y :    {0}".format(yLegend))              
             feedback.pushInfo('____________________')
             feedback.pushInfo('')             
-   
+            (sink2, dest_id2) = self.parameterAsSink(parameters, self.OUTPUT2, context,
+                                               result2['OUTPUT'].fields(), QgsWkbTypes.Polygon, result2['OUTPUT'].crs())        
+            features = result2['OUTPUT'].getFeatures()
+            for feature in features:
+                sink2.addFeature(feature, QgsFeatureSink.FastInsert)      
             global defaultMaxValue
             global defaultMaxRadius
             defaultMaxValue = 100
             defaultMaxRadius = 100
             
-            return {self.OUTPUT: 'OUTPUT', self.OUTPUT2: 'OUTPUT2'}            
+            return {self.OUTPUT: 'dest_id', self.OUTPUT2: 'dest_id2'}            
         else:
             feedback.pushInfo(self.tr('   Légende non demandée'))   
             feedback.pushInfo('____________________')
             feedback.pushInfo('')               
-            return {self.OUTPUT: 'OUTPUT'}
+            return {self.OUTPUT: 'dest_id'}
         
 
     def name(self):
@@ -525,6 +551,8 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
                 self.tr("Legend layer")
             )
         )
+        
+
     def processAlgorithm(self, parameters, context, feedback):
         """
         Here is where the processing itself takes place.
@@ -537,8 +565,11 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         source = self.parameterAsSource(parameters, self.INPUT, context).materialize(QgsFeatureRequest())
         stockValue = self.parameterAsString(parameters, self.COLUMN , context)  
 
-        OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)
-
+        # OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)
+        
+        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
+                                               pr.fields(), QgsWkbTypes.Polygon, vl.crs()) 
+                                               
         automaticLegend = self.parameterAsBool(parameters,self.LEGEND,context)        
         features = source.getFeatures()
         attributeList = sorted([abs(element[stockValue]) for element in features if element[stockValue] != None], reverse=True)
@@ -791,20 +822,30 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
         # algorithm is run in QGIS).
+        """
         self.addParameter(
             QgsProcessingParameterVectorDestination(
                 self.OUTPUT,
                 self.tr("Output layer")
             )
         )
+        """
+        self.addParameter(
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT, 
+                self.tr('Output layer'), 
+                type=QgsProcessing.TypeVectorPolygon
+            )
+        )        
         
     def processAlgorithm(self, parameters, context, feedback):
         """
         Here is where the processing itself takes place.
         """
         
-        OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)  
+        # OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)  
         
+      
         # Type of symbols
         represetation = self.parameterAsInt( parameters, self.SHAPE, context )
         if self.parameterAsInt( parameters, self.SHAPE, context ) == 0:
@@ -858,8 +899,8 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         if len(legendCustomValues) == 0:
             legendCustomValues = (maxValue,maxValue/3,maxValue/9)
         else:
-            legendCustomValues = sorted(legendCustomValues, reverse= True)
-            legendCustomValues =[float(item) for item in legendCustomValues ]
+            # legendCustomValues = sorted(legendCustomValues, reverse= True)
+            legendCustomValues =sorted([float(item) for item in legendCustomValues ], reverse = True)
         for i in legendCustomValues:
             radius = coeff * (i/math.pi) ** .5
             f = QgsFeature()
@@ -872,7 +913,9 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
             f.setAttributes([i, radius, "texte"])
             pr.addFeature(f)
         vl.updateExtents() 
-        
+        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
+                                               pr.fields(), QgsWkbTypes.Polygon, vl.crs()) 
+                                               
         feedback.pushInfo(self.tr('     • Liste des valeurs à afficher : {0}'.format(legendCustomValues))) 
         feedback.pushInfo('')  
         feedback.pushInfo(self.tr('    Coordonnées de la légende :'))             
@@ -888,17 +931,22 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
                          'HEIGHT': 'R',
                          'ROTATION':None,
                          'SEGMENTS':36,
-                         'OUTPUT':OUTPUT},
+                         'OUTPUT':'memory:'},
                           feedback = feedback)
 
 
+        # Add features to the sink
+        features = result['OUTPUT'].getFeatures()
+        for feature in features:
+            sink.addFeature(feature, QgsFeatureSink.FastInsert)       
+            
         # Return the results of the algorithm. In this case our only result is
         # the feature sink which contains the processed features, but some
         # algorithms may return multiple feature sinks, calculated numeric
         # statistics, etc. These should all be included in the returned
         # dictionary, with keys matching the feature corresponding parameter
         # or output names.
-        return {self.OUTPUT: 'OUTPUT'}
+        return {self.OUTPUT: dest_id}
 
     def shortHelpString(self):
         return self.tr("Légende pour les analyses en ronds.\n \n \
