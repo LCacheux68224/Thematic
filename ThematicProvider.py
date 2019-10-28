@@ -38,6 +38,7 @@ from .SmoothingAlgorithms import SmoothToGridAlgorithm
 from .CirclesAlgorithms import CreateAutomaticSymbolsAlgorithm
 from .CirclesAlgorithms import CreateCustomSymbolsAlgorithm
 from .CirclesAlgorithms import CreateCirclesLegendAlgorithm
+from .CirclesAlgorithms import FormatProportionalSymbolsLegendAlgorithm
 import os
 from qgis.PyQt.QtGui import QIcon
 
@@ -52,7 +53,8 @@ class ThematicProvider(QgsProcessingProvider):
                         CreateInspireGridAlgorithm(),
                         CreateAutomaticSymbolsAlgorithm(),
                         CreateCustomSymbolsAlgorithm(),
-                        CreateCirclesLegendAlgorithm()]
+                        CreateCirclesLegendAlgorithm(),
+                        FormatProportionalSymbolsLegendAlgorithm()]
 
     def unload(self):
         """

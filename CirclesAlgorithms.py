@@ -973,10 +973,12 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
                           feedback = feedback)
 
 
+
+             
         # Add features to the sink
         features = result['OUTPUT'].getFeatures()
         for feature in features:
-            sink.addFeature(feature, QgsFeatureSink.FastInsert)       
+            sink.addFeature(feature, QgsFeatureSink.FastInsert)   
             
         # Return the results of the algorithm. In this case our only result is
         # the feature sink which contains the processed features, but some
@@ -985,7 +987,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         # dictionary, with keys matching the feature corresponding parameter
         # or output names.
         return {self.OUTPUT: dest_id}
-
+        
     def shortHelpString(self):
         return self.tr("Légende pour les analyses en ronds.\n \n \
                        <h3>Échelle des ronds</h3> \n \
@@ -1041,4 +1043,133 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/iconRondsLegende.png')
 
+class FormatProportionalSymbolsLegendAlgorithm(QgsProcessingAlgorithm):
+    """
+    This is an example algorithm that takes a vector layer and
+    creates a new identical one.
 
+    It is meant to be used as an example of how to create your own
+    algorithms and explain methods and variables used to do it. An
+    algorithm like this will be available in all elements, and there
+    is not need for additional work.
+
+    All Processing algorithms should extend the QgsProcessingAlgorithm
+    class.
+    """
+
+    # Constants used to refer to parameters and outputs. They will be
+    # used when calling the algorithm from another algorithm, or when
+    # calling from the QGIS console.
+
+    INPUT = 'INPUT'
+    SHAPE = 'SHAPE'
+    
+    def initAlgorithm(self, config):
+        """
+        Here we define the inputs and output of the algorithm, along
+        with some other properties.
+        """
+        
+        # We add the input vector features source. It can have any kind of
+        # geometry.
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT,
+                self.tr('Input layer'),
+                [QgsProcessing.TypeVectorPolygon,QgsProcessing.TypeVectorPoint],
+                optional=False
+            )
+        )
+
+        project = QgsProject.instance()
+
+        try:
+            representation = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesRepresentation')
+        except:
+            representation = 0
+            
+        self.shapes = [self.tr('Circles'), self.tr('Diamons'), self.tr('Squares')]
+        self.addParameter(QgsProcessingParameterEnum(
+                self.SHAPE,
+                self.tr('Type of representation'),
+                defaultValue = representation,
+                options=self.shapes
+            )
+        ) 
+            
+    def processAlgorithm(self, parameters, context, feedback):
+        """
+        Here is where the processing itself takes place.
+        """
+
+        # Retrieve the feature source and sink. The 'dest_id' variable is used
+        # to uniquely identify the feature sink, and must be included in the
+        # dictionary returned by the processAlgorithm function.
+        
+        source = self.parameterAsVectorLayer(parameters, self.INPUT, context)
+        # Type of symbols
+        representation0 = self.parameterAsInt( parameters, self.SHAPE, context )
+        
+        if self.parameterAsInt( parameters, self.SHAPE, context ) == 0:
+            # circles
+            source.loadNamedStyle(os.path.dirname(__file__) + '/styles/circles_legend.qml')
+        elif self.parameterAsInt( parameters, self.SHAPE, context ) == 1:
+            # diamons
+            source.loadNamedStyle(os.path.dirname(__file__) + '/styles/diamons_legend.qml')
+        else:
+            # squares
+            source.loadNamedStyle(os.path.dirname(__file__) + '/styles/squares_legend.qml')
+            
+        source.triggerRepaint()
+        return {self.INPUT: source}
+
+    def name(self):
+        """
+        Returns the algorithm name, used for identifying the algorithm. This
+        string should be fixed for the algorithm, and must not be localised.
+        The name should be unique within each provider. Names should contain
+        lowercase alphanumeric characters only and no spaces or other
+        formatting characters.
+        """
+        return 'formatproportionalsymbolslegend'
+
+    def displayName(self):
+        """
+        Returns the translated algorithm name, which should be used for any
+        user-visible display of the algorithm name.
+        """
+        return self.tr('Format Legend')
+
+    def group(self):
+        """
+        Returns the name of the group this algorithm belongs to. This string
+        should be localised.
+        """
+        return self.tr('Proportional symbols')
+
+    def groupId(self):
+        """
+        Returns the unique ID of the group this algorithm belongs to. This
+        string should be fixed for the algorithm, and must not be localised.
+        The group id should be unique within each provider. Group id should
+        contain lowercase alphanumeric characters only and no spaces or other
+        formatting characters.
+        """
+        return 'proportionalsymbols'
+
+    def tr(self, string):
+        return QCoreApplication.translate('Processing', string)
+
+    def createInstance(self):
+        return FormatProportionalSymbolsLegendAlgorithm()
+
+    def icon(self):
+        return QIcon(os.path.dirname(__file__) + '/images/iconRonds.png')
+        
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("Description html") 
