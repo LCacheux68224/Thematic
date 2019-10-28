@@ -289,6 +289,8 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         
         # crs = source2.crs().authid()
 
+
+
         # Type of symbols
         representation = self.parameterAsInt( parameters, self.SHAPE, context )
         if self.parameterAsInt( parameters, self.SHAPE, context ) == 0:
@@ -305,23 +307,16 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                          'ALL_PARTS':False,
                          'OUTPUT':'memory:'},
                           feedback = feedback)   
-        '''                  
-        sqlQuerry = 'select * from input1 order by {0} DESC'.format(radiusName)
-        source10 = centroid['OUTPUT']
-        orderedShape = processing.run("qgis:executesql",
-                {'INPUT_DATASOURCES':[source10],
-                 'INPUT_QUERY':sqlQuerry,
-                 'INPUT_UID_FIELD':'',
-                 'INPUT_GEOMETRY_FIELD':'',
-                 'INPUT_GEOMETRY_TYPE':0,
-                 'INPUT_GEOMETRY_CRS':None,
-                 'OUTPUT':'memory:'},
-                 feedback = feedback)
-        '''                                 
-        # QgsMessageLog.logMessage("extended : {0}".format(dir(source)), 'Thematic Plugin', 0)
-        
-        result = processing.run("qgis:rectanglesovalsdiamondsvariable",
+        sortedLayer = processing.run("native:orderbyexpression", 
                         {'INPUT': centroid['OUTPUT'],
+                         'EXPRESSION':'\"R\"',
+                         'ASCENDING':False,
+                         'NULLS_FIRST':False,
+                         'OUTPUT':'memory:'})                             
+                # QgsMessageLog.logMessage("extended : {0}".format(dir(source)), 'Thematic Plugin', 0)
+                
+        result = processing.run("qgis:rectanglesovalsdiamondsvariable",
+                        {'INPUT': sortedLayer['OUTPUT'],
                          'SHAPE':representation0,
                          'WIDTH':radiusName,
                          'HEIGHT':radiusName,
@@ -643,9 +638,15 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
                          'ALL_PARTS':False,
                          'OUTPUT':'memory:'},
                           feedback = feedback)   
+        sortedLayer = processing.run("native:orderbyexpression", 
+                        {'INPUT': centroid['OUTPUT'],
+                         'EXPRESSION':'\"R\"',
+                         'ASCENDING':False,
+                         'NULLS_FIRST':False,
+                         'OUTPUT':'memory:'}) 
 
         result = processing.run("qgis:rectanglesovalsdiamondsvariable",
-                        {'INPUT': centroid['OUTPUT'],
+                        {'INPUT': sortedLayer['OUTPUT'],
                          'SHAPE':representation,
                          'WIDTH':'R',
                          'HEIGHT':'R',
