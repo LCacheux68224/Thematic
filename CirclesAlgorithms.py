@@ -56,7 +56,9 @@ from qgis.core import (QgsProcessing,
                        QgsGeometry,
                        QgsPointXY,
                        QgsProject,
-                       QgsVectorFileWriter)
+                       QgsVectorFileWriter,
+                       QgsExpressionContextUtils, 
+                       QgsProject)
 from qgis.utils import iface
 import processing , math
 from qgis.PyQt.QtGui import *
@@ -102,9 +104,6 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         Here we define the inputs and output of the algorithm, along
         with some other properties.
         """
-
-        self.oldMaxRadius = 0
-        self.oldMaxValue = 0
             
         # We add the input vector features source. It can have any kind of
         # geometry.
@@ -293,6 +292,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
 
         # Type of symbols
         representation = self.parameterAsInt( parameters, self.SHAPE, context )
+
         if self.parameterAsInt( parameters, self.SHAPE, context ) == 0:
             # circles
             representation0 = 2
@@ -342,6 +342,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(self.tr('   Échelle automatique :'))   
         feedback.pushInfo("      • Val :  {0}".format(val1))
         feedback.pushInfo("      • R :    {0}".format(maxRadius0))  
+
         if automaticLegend:       
             # OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context) 
             xLegend = source.sourceExtent().xMaximum()+maxRadius0
@@ -369,10 +370,6 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
             features = result2['OUTPUT'].getFeatures()
             for feature in features:
                 sink2.addFeature(feature, QgsFeatureSink.FastInsert)      
-            global defaultMaxValue
-            global defaultMaxRadius
-            defaultMaxValue = 100
-            defaultMaxRadius = 100
             
             return {self.OUTPUT: 'dest_id', self.OUTPUT2: 'dest_id2'}            
         else:
@@ -470,11 +467,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         Here we define the inputs and output of the algorithm, along
         with some other properties.
         """
-
         
-        self.oldMaxRadius = 0
-        self.oldMaxValue = 0
-            
         # We add the input vector features source. It can have any kind of
         # geometry.
         self.addParameter(
@@ -624,6 +617,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
        
         # Type of symbols
         representation0 = self.parameterAsInt( parameters, self.SHAPE, context )
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesRepresentation',representation0)
         if self.parameterAsInt( parameters, self.SHAPE, context ) == 0:
             # circles
             representation = 2
@@ -671,7 +665,8 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo('')
         feedback.pushInfo(self.tr('    Échelle personnalisée :'))  
         feedback.pushInfo("      • Val :  {0}".format(maxValue))
-        feedback.pushInfo("      • R :    {0}".format(maxRadius))                    
+        feedback.pushInfo("      • R :    {0}".format(maxRadius))
+        
         if automaticLegend:       
             # OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context)
             xLegend = source.sourceExtent().xMaximum()+maxRadius
@@ -793,11 +788,22 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         Here we define the inputs and output of the algorithm, along
         with some other properties.
         """
-        
+        project = QgsProject.instance()
+
+        try:
+            maxValue = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesMaxValue')
+            maxRadius = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesMaxRadius')
+            representation = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesRepresentation')
+        except:
+            maxValue = 0
+            maxRadius = 0
+            representation = 0
+            
         self.shapes = [self.tr('Circles'), self.tr('Diamons'), self.tr('Squares')]
         self.addParameter(QgsProcessingParameterEnum(
                 self.SHAPE,
                 self.tr('Type of representation'),
+                defaultValue = representation,
                 options=self.shapes
             )
         ) 
@@ -808,6 +814,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
                 self.MAX_VALUE,
                 self.tr('Max value'),
                 minValue=0,
+                defaultValue = maxValue,
                 optional=False
             )
         )
@@ -817,6 +824,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
                 self.MAX_RADIUS,
                 self.tr('Max radius (in meters)'),
                 minValue=0,
+                defaultValue = maxRadius,
                 optional=False
             )
         )
@@ -868,16 +876,17 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         """
         Here is where the processing itself takes place.
         """
-        
+        project = QgsProject.instance()
         # OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)  
         
       
         # Type of symbols
-        represetation = self.parameterAsInt( parameters, self.SHAPE, context )
-        if self.parameterAsInt( parameters, self.SHAPE, context ) == 0:
+        representation = self.parameterAsInt( parameters, self.SHAPE, context )
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesRepresentation',representation)
+        if representation == 0:
             # circles
             representation = 2
-        elif self.parameterAsInt( parameters, self.SHAPE, context ) == 1:
+        elif representation == 1:
             representation = 1
         else:
             # squares
@@ -896,7 +905,10 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(self.tr('     • Val : {0}'.format(maxValue)))   
         feedback.pushInfo(self.tr('     • R : {0}'.format(maxRadius)))              
         feedback.pushInfo('')    
-     
+        
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesMaxValue',maxValue)
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesMaxRadius',maxRadius)
+ 
         
         if len(coordsLegendText) >0 :
             legendCoordsList = coordsLegendText.strip().split(',')
