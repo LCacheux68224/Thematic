@@ -39,6 +39,8 @@ from .CirclesAlgorithms import CreateAutomaticSymbolsAlgorithm
 from .CirclesAlgorithms import CreateCustomSymbolsAlgorithm
 from .CirclesAlgorithms import CreateCirclesLegendAlgorithm
 from .CirclesAlgorithms import FormatProportionalSymbolsLegendAlgorithm
+
+from .FlowsAlgorithms import CreateLinesAlgorithm
 import os
 from qgis.PyQt.QtGui import QIcon
 
@@ -54,7 +56,8 @@ class ThematicProvider(QgsProcessingProvider):
                         CreateAutomaticSymbolsAlgorithm(),
                         CreateCustomSymbolsAlgorithm(),
                         CreateCirclesLegendAlgorithm(),
-                        FormatProportionalSymbolsLegendAlgorithm()]
+                        FormatProportionalSymbolsLegendAlgorithm(),
+                        CreateLinesAlgorithm()]
 
     def unload(self):
         """
