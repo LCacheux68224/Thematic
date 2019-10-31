@@ -56,9 +56,7 @@ from qgis.core import (QgsProcessing,
                        QgsDistanceArea,
                        QgsWkbTypes)
 import processing
-# --------------------------- #
-# Create a grid from a layer  #
-# --------------------------- #
+
 
 class CreateLinesAlgorithm(QgsProcessingAlgorithm):
     """
@@ -174,7 +172,7 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
         params.append(
             QgsProcessingParameterNumber(
                 self.MAX_DIST,
-                self.tr('Max distance (in meters)'),
+                self.tr('Max distance (in km)'),
                 defaultValue=0,
                 minValue=0,
                 optional=False
@@ -213,6 +211,10 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
         geographicIdName = self.parameterAsString(parameters, self.CODGEO , context)
         geometryLayer = self.parameterAsSource(parameters, self.INPUT2, context).materialize(QgsFeatureRequest())         
         codgeoIndex = geometryLayer.fields().indexOf(geographicIdName)
+        layerExtent = geometryLayer.extent()
+        minimumExtent = min((layerExtent.xMaximum()-layerExtent.xMinimum())/2,(layerExtent.yMaximum()-layerExtent.yMinimum())/2)
+        
+        feedback.pushInfo("      • etendue :    {0}".format(minimumExtent))        
 
         crsString = geometryLayer.crs().authid() 
         # extract coordinates of the centroid of the geometryLayer as a dictionary
@@ -245,11 +247,14 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
         pr.addAttributes([(QgsField("ORIGINE", QVariant.String)),
                           (QgsField("DEST", QVariant.String)),
                           (QgsField("FLUX", QVariant.Double)),
-                          (QgsField("DIST_KM", QVariant.Double))])
+                          (QgsField("DIST_KM", QVariant.Double)),
+                          (QgsField("LARGEUR", QVariant.Double))])
         vl.updateFields() 
         
         notInLayer = 0
         
+        maxValue = max([abs(item.attributes()[valueFieldIndex]) for item in inputTable.getFeatures()]) 
+        feedback.pushInfo("      • valeur maximale :    {0}".format(maxValue))
         for elem in inputTable.getFeatures():
             value = float(elem.attributes()[valueFieldIndex])
             pointA = coordinatesDictionnary[elem.attributes()[originFieldIndex]]
@@ -266,12 +271,17 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
                     f.setAttributes([elem.attributes()[originFieldIndex],
                                      elem.attributes()[destinationFieldIndex],
                                      value, 
-                                     distance])
+                                     distance,
+                                     value*(minimumExtent/25)/maxValue])
                     pr.addFeature(f)
         vl.updateExtents() 
+        vl.renderer().symbol().setWidth(3)        
         # Add features to the sink
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
-                                               vl.fields(), QgsWkbTypes.LineString, vl.crs())        
+                                               vl.fields(), QgsWkbTypes.LineString, vl.crs())
+        feedback.pushInfo("      • sink :    {0}".format(type(context)))
+        dest_id.renderer().symbol().setWidth(3) 
+        # vl.triggerRepaint()        
         features = vl.getFeatures()
 
         for feature in features:
@@ -333,5 +343,145 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
         return QIcon(os.path.dirname(__file__) + '/images/oursins.png')
         
 
+class ShortenLinesAlgorithm(QgsProcessingAlgorithm):
+    """
+    This is an example algorithm that takes a vector layer and
+    creates a new identical one.
 
+    It is meant to be used as an example of how to create your own
+    algorithms and explain methods and variables used to do it. An
+    algorithm like this will be available in all elements, and there
+    is not need for additional work.
+
+    All Processing algorithms should extend the QgsProcessingAlgorithm
+    class.
+    """
+
+    # Constants used to refer to parameters and outputs. They will be
+    # used when calling the algorithm from another algorithm, or when
+    # calling from the QGIS console.
+
+    OUTPUT_LAYER = 'OUTPUT_LAYER'
+    INPUT = 'INPUT'
+    DISTANCE = 'DISTANCE'
+    TARGET = 'TARGET'
+
+    def initAlgorithm(self, config):
+        """
+        Here we define the inputs and output of the algorithm, along
+        with some other properties.
+        """
+
+        # We add the input vector features source. It can have any kind of
+        # geometry.
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT,
+                self.tr('Input layer'),
+                [QgsProcessing.TypeVectorLine]
+            )
+        ) 
+        self.targetList = [self.tr('From origin'), self.tr('To destination')]
+        self.addParameter(QgsProcessingParameterEnum(
+                self.TARGET,
+                self.tr('Shorten...'),
+                defaultValue = 0,
+                options=self.targetList
+            )
+        )
+        self.addParameter(QgsProcessingParameterNumber(
+                self.DISTANCE,
+                self.tr('Distance (in km)'),
+                defaultValue=10,
+                minValue = 1,
+                optional=False
+            )
+        )
+        self.addParameter(
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT_LAYER, 
+                self.tr('Output layer'), 
+                type=QgsProcessing.TypeVectorPolygon
+            )
+        ) 
+            
+    def processAlgorithm(self, parameters, context, feedback):
+        """
+        Here is where the processing itself takes place.
+        """
+
+        # Retrieve the feature source and sink. The 'dest_id' variable is used
+        # to uniquely identify the feature sink, and must be included in the
+        # dictionary returned by the processAlgorithm function.
+        
+        # INPUT = parameters[self.INPUT]
+        # print(self.INPUT.extent())
+        # print(INPUT)
+        
+        # definition : flowList(self, flowTable, indexOrigin, indexDestination, indexValue, coordinatesDictionnary, minValue, maxDistance)
+        # self.flowList(inputTable, originIndex, destinationIndex, valueIndex, coordinates, minValue, maxDistanceKM)
+        
+        
+        inputLayer = self.parameterAsSource(parameters, self.INPUT, context).materialize(QgsFeatureRequest())
+        radius = self.parameterAsDouble(parameters, self.DISTANCE , context)
+        target = self.parameterAsInt( parameters, self.TARGET, context )
+        if target !=0 :
+            target = -1
+        feedback.pushInfo("      • Distance :    {0}".format(radius))
+        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
+                                               inputLayer.fields(), QgsWkbTypes.LineString, inputLayer.crs())             
+
+        # features = result['OUTPUT'].getFeatures()
+        for feature in inputLayer.getFeatures():
+            bufferCenter = QgsGeometry(feature.geometry().get()[target])          
+            bufferPolygon = bufferCenter.buffer(radius*1000, 5)
+            intersectLine = QgsGeometry.intersection(feature.geometry(), bufferPolygon)
+            feature.setGeometry(intersectLine)
+            sink.addFeature(feature, QgsFeatureSink.FastInsert)   
+                                               
+        return {self.OUTPUT_LAYER: dest_id}
+
+
+    def name(self):
+        """
+        Returns the algorithm name, used for identifying the algorithm. This
+        string should be fixed for the algorithm, and must not be localised.
+        The name should be unique within each provider. Names should contain
+        lowercase alphanumeric characters only and no spaces or other
+        formatting characters.
+        """
+        return 'shortenflowlines'
+
+    def displayName(self):
+        """
+        Returns the translated algorithm name, which should be used for any
+        user-visible display of the algorithm name.
+        """
+        return self.tr('Shorten flowlines')
+
+    def group(self):
+        """
+        Returns the name of the group this algorithm belongs to. This string
+        should be localised.
+        """
+        return self.tr('Flows')
+
+    def groupId(self):
+        """
+        Returns the unique ID of the group this algorithm belongs to. This
+        string should be fixed for the algorithm, and must not be localised.
+        The group id should be unique within each provider. Group id should
+        contain lowercase alphanumeric characters only and no spaces or other
+        formatting characters.
+        """
+        return 'flows'
+
+    def tr(self, string):
+        return QCoreApplication.translate('Processing', string)
+
+    def createInstance(self):
+        return ShortenLinesAlgorithm()
+
+    def icon(self):
+        return QIcon(os.path.dirname(__file__) + '/images/oursins.png')
 
