@@ -57,7 +57,13 @@ from qgis.core import (QgsProcessing,
                        QgsPointXY,
                        QgsProject,
                        QgsVectorFileWriter,
-                       QgsExpressionContextUtils, 
+                       QgsExpressionContextUtils,
+                       QgsProcessingUtils,
+                       QgsFillSymbol,
+                       QgsSymbol,
+                       QgsSimpleFillSymbolLayer,
+                       QgsRendererCategory,
+                       QgsCategorizedSymbolRenderer,
                        QgsProject)
 from qgis.utils import iface
 import processing , math
@@ -191,7 +197,8 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         # to uniquely identify the feature sink, and must be included in the
         # dictionary returned by the processAlgorithm function.
         source = self.parameterAsSource(parameters, self.INPUT, context).materialize(QgsFeatureRequest())
-        stockValue = self.parameterAsString(parameters, self.COLUMN , context)  
+        stockValue = self.parameterAsString(parameters, self.COLUMN , context) 
+        self.stockValue = stockValue
         analysisLayer = self.parameterAsSource(parameters, self.ANALYSIS_LAYER, context)        
         # OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context) 
    
@@ -285,10 +292,18 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                          'FORMULA':radiusFormula,
                          'OUTPUT':'memory:'},
                           feedback=feedback)
-        
+        varTexte = u'if( \"{0}\" >= 0,\'1 - {0} > 0\',\'2 - {0} < 0\')'.format(stockValue)
+        variableNameAttribute = processing.run("qgis:fieldcalculator", 
+                        {'INPUT':radiusAttribute['OUTPUT'],
+                         'FIELD_NAME':varName,
+                         'FIELD_TYPE':2,
+                         'FIELD_LENGTH':len(varTexte),
+                         'FIELD_PRECISION':3,
+                         'NEW_FIELD':True,
+                         'FORMULA':varTexte,
+                         'OUTPUT':'memory:'},
+                          feedback=feedback)
         # crs = source2.crs().authid()
-
-
 
         # Type of symbols
         representation = self.parameterAsInt( parameters, self.SHAPE, context )
@@ -303,7 +318,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
             representation0 = 0
             
         centroid = processing.run("native:centroids", 
-                        {'INPUT':radiusAttribute['OUTPUT'],
+                        {'INPUT':variableNameAttribute['OUTPUT'],
                          'ALL_PARTS':False,
                          'OUTPUT':'memory:'},
                           feedback = feedback)   
@@ -342,6 +357,9 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(self.tr('   Échelle automatique :'))   
         feedback.pushInfo("      • Val :  {0}".format(val1))
         feedback.pushInfo("      • R :    {0}".format(maxRadius0))  
+        
+        self.dest_id = dest_id
+        self.varName = varName
 
         if automaticLegend:       
             # OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context) 
@@ -369,8 +387,10 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                                                result2['OUTPUT'].fields(), QgsWkbTypes.Polygon, result2['OUTPUT'].crs())        
             features = result2['OUTPUT'].getFeatures()
             for feature in features:
-                sink2.addFeature(feature, QgsFeatureSink.FastInsert)      
-            
+                sink2.addFeature(feature, QgsFeatureSink.FastInsert)     
+            # to get hold of the layer in post processing for styling the legend
+            self.dest_id2=dest_id2
+            self.representation = representation
             return {self.OUTPUT: 'dest_id', self.OUTPUT2: 'dest_id2'}            
         else:
             feedback.pushInfo(self.tr('   Légende non demandée'))   
@@ -380,8 +400,61 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
             QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesMaxValue',val1)
             QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesMaxRadius',maxRadius0)
             QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesRepresentation',self.parameterAsInt( parameters, self.SHAPE, context ))
+            self.dest_id2 =  None
             return {self.OUTPUT: 'dest_id'}
         
+
+    def postProcessAlgorithm(self, context, feedback):
+        # Styling the analysis
+        output0 = QgsProcessingUtils.mapLayerFromString(self.dest_id, context)
+        categories = []
+        
+        symbol = QgsSymbol.defaultSymbol(output0.geometryType())  
+        layer_style = {}
+        layer_style['color'] = '#fdbf6f'
+        layer_style['outline'] = '#000000'
+        layer_style['outline_width'] = '0.1'
+        symbol_layer = QgsSimpleFillSymbolLayer.create(layer_style)
+        if symbol_layer is not None:
+            symbol.changeSymbolLayer(0, symbol_layer)
+        category = QgsRendererCategory('1 - '+self.stockValue + ' > 0', symbol, str(self.stockValue + ' >= 0'))        
+        categories.append(category)
+    
+        symbol = QgsSymbol.defaultSymbol(output0.geometryType())  
+        layer_style = {}
+        layer_style['color'] = '#a6cee3'
+        layer_style['outline'] = '#000000'
+        layer_style['outline_width'] = '0.1'
+        symbol_layer = QgsSimpleFillSymbolLayer.create(layer_style)
+        if symbol_layer is not None:
+            symbol.changeSymbolLayer(0, symbol_layer)
+        category = QgsRendererCategory('2 - '+self.stockValue + ' < 0', symbol, str(self.stockValue + ' < 0'))        
+        categories.append(category)
+        
+        renderer = QgsCategorizedSymbolRenderer(self.varName, categories)
+        if renderer is not None:
+            output0.setRenderer(renderer)
+        output0.triggerRepaint()
+        
+        # Styling de legend
+        if self.dest_id2 is not None:
+            # Styling the legend
+            output = QgsProcessingUtils.mapLayerFromString(self.dest_id2, context)
+            if self.representation == 0:
+                # circles
+                path = os.path.dirname(__file__) + '/styles/circles_legend.qml'
+            elif self.representation == 1:
+                # diamons
+                path = os.path.dirname(__file__) + '/styles/diamons_legend.qml'
+            else:
+                # squares
+                path = os.path.dirname(__file__) + '/styles/squares_legend.qml'
+            output.loadNamedStyle(path)
+            output.triggerRepaint()
+            return {self.OUTPUT: self.OUTPUT, self.OUTPUT2: self.dest_id2}
+        else:
+            return {self.OUTPUT: self.OUTPUT, self.OUTPUT2: None}
+
 
     def name(self):
         """
@@ -583,7 +656,8 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         # dictionary returned by the processAlgorithm function.
         
         source = self.parameterAsSource(parameters, self.INPUT, context).materialize(QgsFeatureRequest())
-        stockValue = self.parameterAsString(parameters, self.COLUMN , context)  
+        stockValue = self.parameterAsString(parameters, self.COLUMN , context) 
+        self.stockValue = stockValue
 
         # OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)
         
@@ -607,7 +681,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
           
         fieldList = [field.name() for field in source.fields()]    
         
-        valueName, radiusName, varName = 'VAL', 'R', 'VARIABLE'
+        valueName, radiusName, varName = 'VAL', 'R', 'VAR'
         i , iLabel = 0, ''
         while (valueName+iLabel) in fieldList \
                 or (radiusName+iLabel) in fieldList \
@@ -620,6 +694,8 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         radiusName      += iLabel
         varName    += iLabel
         
+        self.varName = varName
+        
         # Ajout de la colonne R
         radiusAttribute = processing.run("qgis:fieldcalculator", 
                         {'INPUT':source,
@@ -631,9 +707,20 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
                          'FORMULA':radiusFormula,
                          'OUTPUT':'memory:'},
                           feedback=feedback)
-       
+        varTexte = u'if( \"{0}\" >= 0,\'1 - {0} > 0\',\'2 - {0} < 0\')'.format(stockValue)
+        variableNameAttribute = processing.run("qgis:fieldcalculator", 
+                        {'INPUT':radiusAttribute['OUTPUT'],
+                         'FIELD_NAME':varName,
+                         'FIELD_TYPE':2,
+                         'FIELD_LENGTH':len(varTexte),
+                         'FIELD_PRECISION':3,
+                         'NEW_FIELD':True,
+                         'FORMULA':varTexte,
+                         'OUTPUT':'memory:'},
+                          feedback=feedback)
         # Type of symbols
         representation0 = self.parameterAsInt( parameters, self.SHAPE, context )
+        self.representation = representation0
         # QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesRepresentation',representation0)
         if self.parameterAsInt( parameters, self.SHAPE, context ) == 0:
             # circles
@@ -645,7 +732,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
             representation = 0
 
         centroid = processing.run("native:centroids", 
-                        {'INPUT':radiusAttribute['OUTPUT'],
+                        {'INPUT':variableNameAttribute['OUTPUT'],
                          'ALL_PARTS':False,
                          'OUTPUT':'memory:'},
                           feedback = feedback)   
@@ -669,6 +756,8 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         # Add features to the sink
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
                                                result['OUTPUT'].fields(), QgsWkbTypes.Polygon, result['OUTPUT'].crs())    
+                                               
+        self.dest_id  = dest_id
                                                
         features = result['OUTPUT'].getFeatures()
         for feature in features:
@@ -708,7 +797,9 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
             feedback.pushInfo('____________________')            
             feedback.pushInfo('') 
             (sink2, dest_id2) = self.parameterAsSink(parameters, self.OUTPUT2, context,
-                                               result2['OUTPUT'].fields(), QgsWkbTypes.Polygon, result2['OUTPUT'].crs())          
+                                               result2['OUTPUT'].fields(), QgsWkbTypes.Polygon, result2['OUTPUT'].crs())     
+            self.dest_id2 = dest_id2
+            
             features = result2['OUTPUT'].getFeatures()
             for feature in features:
                 sink2.addFeature(feature, QgsFeatureSink.FastInsert)                                                 
@@ -724,6 +815,59 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
             
             return {self.OUTPUT: 'dest_id'}        
 
+
+    def postProcessAlgorithm(self, context, feedback):
+        # Styling the analysis
+        output0 = QgsProcessingUtils.mapLayerFromString(self.dest_id, context)
+        categories = []
+        
+        symbol = QgsSymbol.defaultSymbol(output0.geometryType())  
+        layer_style = {}
+        layer_style['color'] = '#fdbf6f'
+        layer_style['outline'] = '#000000'
+        layer_style['outline_width'] = '0.1'
+        symbol_layer = QgsSimpleFillSymbolLayer.create(layer_style)
+        if symbol_layer is not None:
+            symbol.changeSymbolLayer(0, symbol_layer)
+        category = QgsRendererCategory('1 - '+self.stockValue + ' > 0', symbol, str(self.stockValue + ' >= 0'))        
+        categories.append(category)
+    
+        symbol = QgsSymbol.defaultSymbol(output0.geometryType())  
+        layer_style = {}
+        layer_style['color'] = '#a6cee3'
+        layer_style['outline'] = '#000000'
+        layer_style['outline_width'] = '0.1'
+        symbol_layer = QgsSimpleFillSymbolLayer.create(layer_style)
+        if symbol_layer is not None:
+            symbol.changeSymbolLayer(0, symbol_layer)
+        category = QgsRendererCategory('2 - '+self.stockValue + ' < 0', symbol, str(self.stockValue + ' < 0'))        
+        categories.append(category)
+        
+        renderer = QgsCategorizedSymbolRenderer(self.varName, categories)
+        if renderer is not None:
+            output0.setRenderer(renderer)
+        output0.triggerRepaint()
+        
+        # Styling de legend
+        if self.dest_id2 is not None:
+            # Styling the legend
+            output = QgsProcessingUtils.mapLayerFromString(self.dest_id2, context)
+            if self.representation == 0:
+                # circles
+                path = os.path.dirname(__file__) + '/styles/circles_legend.qml'
+            elif self.representation == 1:
+                # diamons
+                path = os.path.dirname(__file__) + '/styles/diamons_legend.qml'
+            else:
+                # squares
+                path = os.path.dirname(__file__) + '/styles/squares_legend.qml'
+            output.loadNamedStyle(path)
+            output.triggerRepaint()
+            return {self.OUTPUT: self.OUTPUT, self.OUTPUT2: self.dest_id2}
+        else:
+            return {self.OUTPUT: self.OUTPUT, self.OUTPUT2: None}
+            
+            
     def name(self):
         """
         Returns the algorithm name, used for identifying the algorithm. This
@@ -889,7 +1033,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT, 
-                self.tr('Output layer'), 
+                self.tr('Legend layer'), 
                 type=QgsProcessing.TypeVectorPolygon
             )
         )        
@@ -905,6 +1049,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         # Type of symbols
         representation = self.parameterAsInt( parameters, self.SHAPE, context )
         QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesRepresentation',representation)
+        self.representation = representation
         if representation == 0:
             # circles
             representation = 2
@@ -1008,7 +1153,26 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         # statistics, etc. These should all be included in the returned
         # dictionary, with keys matching the feature corresponding parameter
         # or output names.
+        
+        self.dest_id = dest_id
+
         return {self.OUTPUT: dest_id}
+        
+    def postProcessAlgorithm(self, context, feedback):
+        # Styling the legend
+        output = QgsProcessingUtils.mapLayerFromString(self.dest_id, context)
+        if self.representation == 0:
+            # circles
+            path = os.path.dirname(__file__) + '/styles/circles_legend.qml'
+        elif self.representation == 1:
+            # diamons
+            path = os.path.dirname(__file__) + '/styles/diamons_legend.qml'
+        else:
+            # squares
+            path = os.path.dirname(__file__) + '/styles/squares_legend.qml'
+        output.loadNamedStyle(path)
+        output.triggerRepaint()
+        return {self.OUTPUT: self.dest_id}
         
     def shortHelpString(self):
         return self.tr("Légende pour les analyses en ronds.\n \n \
