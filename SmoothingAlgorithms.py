@@ -251,14 +251,14 @@ class CreateGridAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('Generate a grid from a vector layer')
+        return self.tr('Générer une grille à partir d''un fond vecteur')
 
     def group(self):
         """
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Smoothing')
+        return self.tr('Carroyage')
 
     def groupId(self):
         """
@@ -389,7 +389,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Smoothing')
+        return self.tr('Carroyage et lissage')
 
     def groupId(self):
         """
@@ -644,14 +644,14 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('Generate an Inspire grid from a vector layer')
+        return self.tr('Générer une grille Inspire à partir d''un fond vecteur')
 
     def group(self):
         """
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Smoothing')
+        return self.tr('Carroyage et lissage')
 
     def groupId(self):
         """

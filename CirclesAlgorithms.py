@@ -464,21 +464,21 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         lowercase alphanumeric characters only and no spaces or other
         formatting characters.
         """
-        return 'automaticsymbolsscale'
+        return 'automaticproportionalsymbols'
 
     def displayName(self):
         """
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('Symbols with automatic scale')
+        return self.tr('Analyse avec échelle automatique')
 
     def group(self):
         """
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Proportional symbols')
+        return self.tr('Symboles proportionnels')
 
     def groupId(self):
         """
@@ -876,21 +876,21 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         lowercase alphanumeric characters only and no spaces or other
         formatting characters.
         """
-        return 'customsymbolsscale'
+        return 'customproportionalsymbols'
 
     def displayName(self):
         """
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('Symbols with custom scale')
+        return self.tr('Analyse avec échelle personnalisée')
 
     def group(self):
         """
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Proportional symbols')
+        return self.tr('Symboles proportionnels')
 
     def groupId(self):
         """
@@ -1194,21 +1194,21 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         lowercase alphanumeric characters only and no spaces or other
         formatting characters.
         """
-        return 'createcircleslegend'
+        return 'proportionalsymbolslegend'
 
     def displayName(self):
         """
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('Generate legend for proportional circles')
+        return self.tr('Générer une légende seule')
 
     def group(self):
         """
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Proportional symbols')
+        return self.tr('Symboles proportionnels')
 
     def groupId(self):
         """
@@ -1324,14 +1324,14 @@ class FormatProportionalSymbolsLegendAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('Format Legend')
+        return self.tr('Appliquer une symbologie de légende')
 
     def group(self):
         """
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Proportional symbols')
+        return self.tr('Symboles proportionnels')
 
     def groupId(self):
         """

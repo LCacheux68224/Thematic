@@ -41,6 +41,8 @@ from .CirclesAlgorithms import CreateCirclesLegendAlgorithm
 from .CirclesAlgorithms import FormatProportionalSymbolsLegendAlgorithm
 
 from .FlowsAlgorithms import CreateLinesAlgorithm
+from .FlowsAlgorithms import ShortenLinesAlgorithm
+from .FlowsAlgorithms import CreateArrowsAlgorithm
 import os
 from qgis.PyQt.QtGui import QIcon
 
@@ -57,7 +59,9 @@ class ThematicProvider(QgsProcessingProvider):
                         CreateCustomSymbolsAlgorithm(),
                         CreateCirclesLegendAlgorithm(),
                         FormatProportionalSymbolsLegendAlgorithm(),
-                        CreateLinesAlgorithm()]
+                        CreateLinesAlgorithm(),
+                        ShortenLinesAlgorithm(),
+                        CreateArrowsAlgorithm(),]
 
     def unload(self):
         """
@@ -88,7 +92,7 @@ class ThematicProvider(QgsProcessingProvider):
 
         This string should be short (e.g. "Lastools") and localised.
         """
-        return self.tr('Toolset for thematic cartography')
+        return self.tr('Thematic - Boîte à outils cartographique')
 
     def longName(self):
         """
