@@ -58,6 +58,7 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingUtils,
                        QgsArrowSymbolLayer,
                        QgsSymbol,
+                       QgsExpressionContextUtils,
                        QgsWkbTypes)
 import processing
 
@@ -182,6 +183,7 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
                 optional=False
             )
         )    
+
         for param in params:
             param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
             self.addParameter(param)
@@ -540,6 +542,15 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         with some other properties.
         """
 
+        project = QgsProject.instance()
+
+        try:
+            maxValue = QgsExpressionContextUtils.projectScope(project).variable('thematic_arrowsMaxValue')
+            maxWidth = QgsExpressionContextUtils.projectScope(project).variable('thematic_arrowsMaxWidth')
+        except:
+            maxValue = 0
+            maxWidth = 0
+
         # We add the input vector features source. It can have any kind of
         # geometry.
         self.addParameter(
@@ -624,7 +635,8 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
                 minValue=0,
                 optional=False
             )
-        )    
+        )  
+
         for param in params:
             param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
             self.addParameter(param)
@@ -660,8 +672,9 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         codgeoIndex = geometryLayer.fields().indexOf(geographicIdName)
         layerExtent = geometryLayer.extent()
         maximumExtent = max((layerExtent.xMaximum()-layerExtent.xMinimum()),(layerExtent.yMaximum()-layerExtent.yMinimum()))
+
         
-        feedback.pushInfo("      • maximumExtent :    {0}".format(maximumExtent))        
+        # feedback.pushInfo("      • maximumExtent :    {0}".format(maximumExtent))        
 
         crsString = geometryLayer.crs().authid() 
         # extract coordinates of the centroid of the geometryLayer as a dictionary
@@ -671,23 +684,23 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
             centroid = elem.geometry().centroid().asPoint()
             IDvalue = elem.attributes()[codgeoIndex]
             coordinatesDictionnary[IDvalue] = centroid
-
+        feedback.pushInfo("      Variables")
         originField = self.parameterAsString(parameters, self.ORIGIN , context)
         originFieldIndex = inputTable.fields().indexOf(originField)
-        feedback.pushInfo("      • origine :    {0}, [{1}]".format(originField,originFieldIndex+1))
+        feedback.pushInfo("      • Origine :    {0}, [{1}]".format(originField,originFieldIndex+1))
         
         destinationField = self.parameterAsString(parameters, self.DESTINATION , context)
         destinationFieldIndex = inputTable.fields().indexOf(destinationField)
-        feedback.pushInfo("      • destination :    {0}, [{1}]".format(destinationField,destinationFieldIndex+1))
+        feedback.pushInfo("      • Destination :    {0}, [{1}]".format(destinationField,destinationFieldIndex+1))
         
         valueField = self.parameterAsString(parameters, self.STOCK , context)
         valueFieldIndex = inputTable.fields().indexOf(valueField)
-        feedback.pushInfo("      • effectifs :    {0}, [{1}]".format(valueField,valueFieldIndex+1))
-
+        feedback.pushInfo("      • Flux :    {0}, [{1}]".format(valueField,valueFieldIndex+1))
+        feedback.pushInfo("      Filtrage")
         minValue = self.parameterAsDouble(parameters, self.MIN_FLOW , context)
-        feedback.pushInfo("      • Valeur minimale :    {0} individu(s)".format(minValue))
+        feedback.pushInfo("      • Flux minimum :    {0}".format(minValue))
         maxDistanceKM = self.parameterAsDouble(parameters, self.MAX_DIST , context)
-        feedback.pushInfo("      • Distance maximale :    {0} km".format(maxDistanceKM))
+        feedback.pushInfo("      • Distance maximale (0 pour non défini) :    {0} km".format(maxDistanceKM))
 
         vl = QgsVectorLayer("LineString?crs="+crsString, "temp", 'memory')
         pr = vl.dataProvider()
@@ -700,9 +713,17 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         notInLayer = 0
         
         maxValue = max([abs(item.attributes()[valueFieldIndex]) for item in inputTable.getFeatures()]) 
+
         self.maxValue = maxValue
         self.maxWidth = (maximumExtent**(.5))*15
-        feedback.pushInfo("      • valeur maximale :    {0}".format(maxValue))
+            
+        project = QgsProject.instance()            
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxValue',self.maxValue)
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxWidth',self.maxWidth)
+        
+        feedback.pushInfo("     Échelle :    ")
+        feedback.pushInfo("      • valeur maximale :    {0}".format(self.maxValue))
+        feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth))
         for elem in inputTable.getFeatures():
             value = float(elem.attributes()[valueFieldIndex])
             pointA = coordinatesDictionnary[elem.attributes()[originFieldIndex]]
@@ -788,7 +809,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('Flèches joignantes')
+        return self.tr('Flèches joignantes avec échelle automatique')
 
     def group(self):
         """
@@ -815,7 +836,360 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
 
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/iconFlechesJoignantes.png')
+        
+        
+class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
+    """
+    This is an example algorithm that takes a vector layer and
+    creates a new identical one.
 
+    It is meant to be used as an example of how to create your own
+    algorithms and explain methods and variables used to do it. An
+    algorithm like this will be available in all elements, and there
+    is not need for additional work.
+
+    All Processing algorithms should extend the QgsProcessingAlgorithm
+    class.
+    """
+
+    # Constants used to refer to parameters and outputs. They will be
+    # used when calling the algorithm from another algorithm, or when
+    # calling from the QGIS console.
+
+    OUTPUT_LAYER = 'OUTPUT_LAYER'
+    INPUT = 'INPUT'
+    ORIGIN = 'ORIGIN'
+    DESTINATION = 'DESTINATION'
+    STOCK = 'STOCK'
+    INPUT2 = 'INPUT2'
+    MIN_FLOW = 'MIN_FLOW'
+    MAX_DIST = 'MAX_DIST'
+    MAX_VALUE_SCALE = 'MAX_VALUE_SCALE'
+    MAX_WIDTH_SCALE = 'MAX_WIDTH_SCALE'
+    CODGEO = 'CODGEO'
+    
+
+    def initAlgorithm(self, config):
+        """
+        Here we define the inputs and output of the algorithm, along
+        with some other properties.
+        """
+
+        project = QgsProject.instance()
+
+        try:
+            maxValue = QgsExpressionContextUtils.projectScope(project).variable('thematic_arrowsMaxValue')
+            maxWidth = QgsExpressionContextUtils.projectScope(project).variable('thematic_arrowsMaxWidth')
+        except:
+            maxValue = 0
+            maxWidth = 0
+
+        # We add the input vector features source. It can have any kind of
+        # geometry.
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT,
+                self.tr('Table de flux'),
+                [QgsProcessing.TypeVector]
+            )
+        ) 
+        self.addParameter(QgsProcessingParameterField(
+                self.ORIGIN,
+                self.tr('Origine'),
+                None,
+                self.INPUT,
+                QgsProcessingParameterField.String,
+                False
+            )
+        )
+        self.addParameter(QgsProcessingParameterField(
+                self.DESTINATION,
+                self.tr('Destination'),
+                None,
+                self.INPUT,
+                QgsProcessingParameterField.String,
+                False
+            )
+        )
+        self.addParameter(QgsProcessingParameterField(
+                self.STOCK,
+                self.tr('Variable de flux'),
+                None,
+                self.INPUT,
+                QgsProcessingParameterField.Numeric,
+                optional=True
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT2,
+                self.tr('Fond de géolocalisation'),
+                [QgsProcessing.TypeVectorPolygon,QgsProcessing.TypeVectorPoint],
+            optional=False
+            )
+        ) 
+        self.addParameter(QgsProcessingParameterField(
+                self.CODGEO,
+                self.tr('Identifiant géographique'),
+                None,
+                self.INPUT2,
+                QgsProcessingParameterField.String,
+                False
+            )
+        )
+        # We add a feature sink in which to store our processed features (this
+        # usually takes the form of a newly created vector layer when the
+        # algorithm is run in QGIS).
+
+        self.addParameter(
+            QgsProcessingParameterNumber(
+                self.MAX_VALUE_SCALE,
+                self.tr('Valeur maximale échelle'),
+                defaultValue=maxValue,
+                minValue=0,
+                optional=False
+            )
+        )
+        
+        self.addParameter(
+            QgsProcessingParameterNumber(
+                self.MAX_WIDTH_SCALE,
+                self.tr('Largeur maximale des flèches (en mètres)'),
+                defaultValue=maxWidth,
+                minValue=0,
+                optional=False
+            )
+        )
+        
+        params = []
+        params.append(
+            QgsProcessingParameterNumber(
+                self.MIN_FLOW,
+                self.tr('Flux minimum à représenter'),
+                defaultValue=0,
+                minValue=0,
+                optional=False
+            )
+        )
+        
+        params.append(
+            QgsProcessingParameterNumber(
+                self.MAX_DIST,
+                self.tr('Distance maximale des flux (en km)'),
+                defaultValue=0,
+                minValue=0,
+                optional=False
+            )
+        )  
+
+        for param in params:
+            param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
+            self.addParameter(param)
+        
+        self.addParameter(
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT_LAYER, 
+                self.tr('Flèches'), 
+                type=QgsProcessing.TypeVectorPolygon
+            )
+        ) 
+            
+    def processAlgorithm(self, parameters, context, feedback):
+        """
+        Here is where the processing itself takes place.
+        """
+
+        # Retrieve the feature source and sink. The 'dest_id' variable is used
+        # to uniquely identify the feature sink, and must be included in the
+        # dictionary returned by the processAlgorithm function.
+        
+        # INPUT = parameters[self.INPUT]
+        # print(self.INPUT.extent())
+        # print(INPUT)
+        
+        # definition : flowList(self, flowTable, indexOrigin, indexDestination, indexValue, coordinatesDictionnary, minValue, maxDistance)
+        # self.flowList(inputTable, originIndex, destinationIndex, valueIndex, coordinates, minValue, maxDistanceKM)
+        
+        
+        inputTable = self.parameterAsSource(parameters, self.INPUT, context).materialize(QgsFeatureRequest())
+        geographicIdName = self.parameterAsString(parameters, self.CODGEO , context)
+        geometryLayer = self.parameterAsSource(parameters, self.INPUT2, context).materialize(QgsFeatureRequest())         
+        codgeoIndex = geometryLayer.fields().indexOf(geographicIdName)
+        layerExtent = geometryLayer.extent()
+        maximumExtent = max((layerExtent.xMaximum()-layerExtent.xMinimum()),(layerExtent.yMaximum()-layerExtent.yMinimum()))
+        
+        maxValueScale = self.parameterAsInt(parameters,self.MAX_VALUE_SCALE,context)
+        maxWidthScale = self.parameterAsInt(parameters,self.MAX_WIDTH_SCALE,context)
+        
+        # feedback.pushInfo("      • maximumExtent :    {0}".format(maximumExtent))        
+
+        crsString = geometryLayer.crs().authid() 
+        # extract coordinates of the centroid of the geometryLayer as a dictionary
+        coordinatesDictionnary = {}
+        features = geometryLayer.getFeatures()
+        for elem in features:
+            centroid = elem.geometry().centroid().asPoint()
+            IDvalue = elem.attributes()[codgeoIndex]
+            coordinatesDictionnary[IDvalue] = centroid
+        feedback.pushInfo("      Variables")
+        originField = self.parameterAsString(parameters, self.ORIGIN , context)
+        originFieldIndex = inputTable.fields().indexOf(originField)
+        feedback.pushInfo("      • Origine :    {0}, [{1}]".format(originField,originFieldIndex+1))
+        
+        destinationField = self.parameterAsString(parameters, self.DESTINATION , context)
+        destinationFieldIndex = inputTable.fields().indexOf(destinationField)
+        feedback.pushInfo("      • Destination :    {0}, [{1}]".format(destinationField,destinationFieldIndex+1))
+        
+        valueField = self.parameterAsString(parameters, self.STOCK , context)
+        valueFieldIndex = inputTable.fields().indexOf(valueField)
+        feedback.pushInfo("      • Flux :    {0}, [{1}]".format(valueField,valueFieldIndex+1))
+        feedback.pushInfo("      Filtrage")
+        minValue = self.parameterAsDouble(parameters, self.MIN_FLOW , context)
+        feedback.pushInfo("      • Flux minimum :    {0}".format(minValue))
+        maxDistanceKM = self.parameterAsDouble(parameters, self.MAX_DIST , context)
+        feedback.pushInfo("      • Distance maximale (0 pour non défini) :    {0} km".format(maxDistanceKM))
+
+        vl = QgsVectorLayer("LineString?crs="+crsString, "temp", 'memory')
+        pr = vl.dataProvider()
+        pr.addAttributes([(QgsField("ORIGINE", QVariant.String)),
+                          (QgsField("DEST", QVariant.String)),
+                          (QgsField("FLUX", QVariant.Double)),
+                          (QgsField("DIST_KM", QVariant.Double))])
+        vl.updateFields() 
+        
+        notInLayer = 0
+        
+        maxValue = max([abs(item.attributes()[valueFieldIndex]) for item in inputTable.getFeatures()]) 
+        if maxValueScale ==0:
+            self.maxValue = maxValue
+        else: 
+            self.maxValue = maxValueScale
+        if maxWidthScale ==0:
+            self.maxWidth = (maximumExtent**(.5))*15
+        else:
+            self.maxWidth = maxWidthScale
+            
+        project = QgsProject.instance()            
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxValue',self.maxValue)
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxWidth',self.maxWidth)
+        
+        feedback.pushInfo("     Échelle :    ")
+        feedback.pushInfo("      • valeur maximale :    {0}".format(self.maxValue))
+        feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth))
+        for elem in inputTable.getFeatures():
+            value = float(elem.attributes()[valueFieldIndex])
+            pointA = coordinatesDictionnary[elem.attributes()[originFieldIndex]]
+            pointB = coordinatesDictionnary[elem.attributes()[destinationFieldIndex]]
+            
+            if pointA != pointB and (value >= minValue or minValue ==0):
+            
+                line = (pointA,pointB)
+                d = QgsDistanceArea()
+                distance = d.measureLine(pointA,pointB)/1000
+                if (maxDistanceKM == 0 or distance <= maxDistanceKM):
+                    f = QgsFeature()
+                    f.setGeometry(QgsGeometry.fromPolylineXY(line))
+                    f.setAttributes([elem.attributes()[originFieldIndex],
+                                     elem.attributes()[destinationFieldIndex],
+                                     value, 
+                                     distance])
+                    pr.addFeature(f)
+        vl.updateExtents() 
+        vl.renderer().symbol().setWidth(3)        
+        # Add features to the sink
+        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
+                                               vl.fields(), QgsWkbTypes.LineString, vl.crs())
+
+        features = vl.getFeatures()
+
+        for feature in features:
+            sink.addFeature(feature, QgsFeatureSink.FastInsert)   
+        
+        self.dest_id  = dest_id
+
+
+
+
+        # Return the results of the algorithm. In this case our only result is
+        # the feature sink which contains the processed features, but some
+        # algorithms may return multiple feature sinks, calculated numeric
+        # statistics, etc. These should all be included in the returned
+        # dictionary, with keys matching the feature corresponding parameter
+        # or output names.
+        return {self.OUTPUT_LAYER: dest_id}
+
+    def postProcessAlgorithm(self, context, feedback):
+        # Styling the arrows
+        output = QgsProcessingUtils.mapLayerFromString(self.dest_id, context)
+        path = os.path.dirname(__file__) + '/styles/simple_arrows.qml'
+        output.loadNamedStyle(path)
+        
+        layerProperties = output.renderer().symbol().symbolLayers()[0].dataDefinedProperties()
+        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)'.format(self.maxValue, self.maxWidth)
+        # PropertyArrowWidth -> 44
+        layerProperties.property(44).setExpressionString(expressionString)
+        # PropertyArrowStartWidth -> 45
+        layerProperties.property(45).setExpressionString(expressionString)
+        
+        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)*0.8'.format(self.maxValue, self.maxWidth)
+        # PropertyArrowHeadLength -> 46
+        layerProperties.property(46).setExpressionString(expressionString)
+        # PropertyArrowHeadThickness -> 47
+        layerProperties.property(47).setExpressionString(expressionString)
+        
+        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)'.format(self.maxValue, self.maxWidth)
+        # PropertyOffset -> 7
+        layerProperties.property(7).setExpressionString(expressionString)        
+        
+        
+        output.triggerRepaint()
+        
+        return {self.OUTPUT_LAYER: self.dest_id}
+
+    def name(self):
+        """
+        Returns the algorithm name, used for identifying the algorithm. This
+        string should be fixed for the algorithm, and must not be localised.
+        The name should be unique within each provider. Names should contain
+        lowercase alphanumeric characters only and no spaces or other
+        formatting characters.
+        """
+        return 'customarrows'
+
+    def displayName(self):
+        """
+        Returns the translated algorithm name, which should be used for any
+        user-visible display of the algorithm name.
+        """
+        return self.tr('Flèches joignantes avec échelle personnalisée')
+
+    def group(self):
+        """
+        Returns the name of the group this algorithm belongs to. This string
+        should be localised.
+        """
+        return self.tr('Flux')
+
+    def groupId(self):
+        """
+        Returns the unique ID of the group this algorithm belongs to. This
+        string should be fixed for the algorithm, and must not be localised.
+        The group id should be unique within each provider. Group id should
+        contain lowercase alphanumeric characters only and no spaces or other
+        formatting characters.
+        """
+        return 'flows'
+
+    def tr(self, string):
+        return QCoreApplication.translate('Processing', string)
+
+    def createInstance(self):
+        return CreateCustomArrowsAlgorithm()
+
+    def icon(self):
+        return QIcon(os.path.dirname(__file__) + '/images/iconFlechesJoignantes.png')
+        
 class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
     """
     This is an example algorithm that takes a vector layer and
@@ -851,7 +1225,7 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         Here we define the inputs and output of the algorithm, along
         with some other properties.
         """
-
+            
         # We add the input vector features source. It can have any kind of
         # geometry.
         self.addParameter(
@@ -937,6 +1311,7 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
                 optional=False
             )
         )    
+        
         for param in params:
             param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
             self.addParameter(param)
@@ -974,7 +1349,8 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         layerExtent = geometryLayer.extent()
         maximumExtent = max((layerExtent.xMaximum()-layerExtent.xMinimum()),(layerExtent.yMaximum()-layerExtent.yMinimum()))
         
-        feedback.pushInfo("      • maximumExtent :    {0}".format(maximumExtent))        
+        
+        # feedback.pushInfo("      • maximumExtent :    {0}".format(maximumExtent))        
 
         crsString = geometryLayer.crs().authid() 
         # extract coordinates of the centroid of the geometryLayer as a dictionary
@@ -1014,7 +1390,7 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         
         maxValue = max([abs(item.attributes()[valueFieldIndex]) for item in inputTable.getFeatures()])
 
-        self.maxValue = maxValue
+            
         # self.maxWidth = (maximumExtent**(.5))*15
         feedback.pushInfo("      • valeur maximale :    {0}".format(maxValue))
         for elem in inputTable.getFeatures():
@@ -1039,7 +1415,18 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         vl.renderer().symbol().setWidth(3)  
         minDistance = min([abs(item.attributes()[3]) for item in vl.getFeatures()])*.8
         self.maxWidth = 1000*minDistance/3
-        feedback.pushInfo(self.tr('     • Dist mini : {0}'.format(minDistance)))
+
+        self.maxValue = maxValue
+
+            
+        project = QgsProject.instance()            
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxValue',self.maxValue)
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxWidth',self.maxWidth)
+        
+        feedback.pushInfo("     Échelle :    ")
+        feedback.pushInfo("      • valeur maximale :    {0}".format(self.maxValue))
+        feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth))
+        
         shortLines = processing.run("thematic:shortenlines", 
                                 {'INPUT':vl,
                                  'TARGET':direction,
@@ -1112,7 +1499,7 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('Flèches saphir')
+        return self.tr('Flèches saphir avec échelle automatique')
 
     def group(self):
         """
@@ -1136,6 +1523,381 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
 
     def createInstance(self):
         return CreateSaphirArrowsAlgorithm()
+
+    def icon(self):
+        return QIcon(os.path.dirname(__file__) + '/images/saphir.png')
+        
+class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
+    """
+    This is an example algorithm that takes a vector layer and
+    creates a new identical one.
+
+    It is meant to be used as an example of how to create your own
+    algorithms and explain methods and variables used to do it. An
+    algorithm like this will be available in all elements, and there
+    is not need for additional work.
+
+    All Processing algorithms should extend the QgsProcessingAlgorithm
+    class.
+    """
+
+    # Constants used to refer to parameters and outputs. They will be
+    # used when calling the algorithm from another algorithm, or when
+    # calling from the QGIS console.
+
+    OUTPUT_LAYER = 'OUTPUT_LAYER'
+    INPUT = 'INPUT'
+    ORIGIN = 'ORIGIN'
+    DESTINATION = 'DESTINATION'
+    STOCK = 'STOCK'
+    INPUT2 = 'INPUT2'
+    DIRECTION = 'DIRECTION'
+    MIN_FLOW = 'MIN_FLOW'
+    MAX_DIST = 'MAX_DIST'
+    MAX_VALUE_SCALE = 'MAX_VALUE_SCALE'
+    MAX_WIDTH_SCALE = 'MAX_WIDTH_SCALE'
+    CODGEO = 'CODGEO'
+    
+
+    def initAlgorithm(self, config):
+        """
+        Here we define the inputs and output of the algorithm, along
+        with some other properties.
+        """
+
+        project = QgsProject.instance()
+
+        try:
+            maxValue = QgsExpressionContextUtils.projectScope(project).variable('thematic_arrowsMaxValue')
+            maxWidth = QgsExpressionContextUtils.projectScope(project).variable('thematic_arrowsMaxWidth')
+        except:
+            maxValue = 0
+            maxWidth = 0
+            
+        # We add the input vector features source. It can have any kind of
+        # geometry.
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT,
+                self.tr('Table de flux'),
+                [QgsProcessing.TypeVector]
+            )
+        ) 
+        self.addParameter(QgsProcessingParameterField(
+                self.ORIGIN,
+                self.tr('Origine'),
+                None,
+                self.INPUT,
+                QgsProcessingParameterField.String,
+                False
+            )
+        )
+        self.addParameter(QgsProcessingParameterField(
+                self.DESTINATION,
+                self.tr('Destination'),
+                None,
+                self.INPUT,
+                QgsProcessingParameterField.String,
+                False
+            )
+        )
+        self.addParameter(QgsProcessingParameterField(
+                self.STOCK,
+                self.tr('Variable de flux'),
+                None,
+                self.INPUT,
+                QgsProcessingParameterField.Numeric,
+                optional=True
+            )
+        )
+        self.shapes = [self.tr('Entrante / solde'), self.tr('Sortante')]
+        self.addParameter(QgsProcessingParameterEnum(
+                self.DIRECTION,
+                self.tr('Direction des flux'),
+                defaultValue = 0,
+                options=self.shapes
+            )
+        ) 
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT2,
+                self.tr('Fond de géolocalisation'),
+                [QgsProcessing.TypeVectorPolygon,QgsProcessing.TypeVectorPoint],
+            optional=False
+            )
+        ) 
+        self.addParameter(QgsProcessingParameterField(
+                self.CODGEO,
+                self.tr('Identifiant géographique'),
+                None,
+                self.INPUT2,
+                QgsProcessingParameterField.String,
+                False
+            )
+        )
+        # We add a feature sink in which to store our processed features (this
+        # usually takes the form of a newly created vector layer when the
+        # algorithm is run in QGIS).
+        self.addParameter(
+            QgsProcessingParameterNumber(
+                self.MAX_VALUE_SCALE,
+                self.tr('Valeur maximale échelle'),
+                defaultValue=maxValue,
+                minValue=0,
+                optional=False
+            )
+        )
+        
+        self.addParameter(
+            QgsProcessingParameterNumber(
+                self.MAX_WIDTH_SCALE,
+                self.tr('Largeur maximale des flèches (en mètres)'),
+                defaultValue=maxWidth,
+                minValue=0,
+                optional=False
+            )
+        )
+
+        params = []
+        params.append(
+            QgsProcessingParameterNumber(
+                self.MIN_FLOW,
+                self.tr('Flux minimum à représenter'),
+                defaultValue=0,
+                minValue=0,
+                optional=False
+            )
+        )
+        
+        params.append(
+            QgsProcessingParameterNumber(
+                self.MAX_DIST,
+                self.tr('Distance maximale des flux (en km)'),
+                defaultValue=0,
+                minValue=0,
+                optional=False
+            )
+        )    
+
+        
+        for param in params:
+            param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
+            self.addParameter(param)
+        
+        self.addParameter(
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT_LAYER, 
+                self.tr('Flèches'), 
+                type=QgsProcessing.TypeVectorPolygon
+            )
+        ) 
+            
+    def processAlgorithm(self, parameters, context, feedback):
+        """
+        Here is where the processing itself takes place.
+        """
+
+        # Retrieve the feature source and sink. The 'dest_id' variable is used
+        # to uniquely identify the feature sink, and must be included in the
+        # dictionary returned by the processAlgorithm function.
+        
+        # INPUT = parameters[self.INPUT]
+        # print(self.INPUT.extent())
+        # print(INPUT)
+        
+        # definition : flowList(self, flowTable, indexOrigin, indexDestination, indexValue, coordinatesDictionnary, minValue, maxDistance)
+        # self.flowList(inputTable, originIndex, destinationIndex, valueIndex, coordinates, minValue, maxDistanceKM)
+        
+        
+        inputTable = self.parameterAsSource(parameters, self.INPUT, context).materialize(QgsFeatureRequest())
+        direction = self.parameterAsInt( parameters, self.DIRECTION, context )
+        geographicIdName = self.parameterAsString(parameters, self.CODGEO , context)
+        geometryLayer = self.parameterAsSource(parameters, self.INPUT2, context).materialize(QgsFeatureRequest())         
+        codgeoIndex = geometryLayer.fields().indexOf(geographicIdName)
+        layerExtent = geometryLayer.extent()
+        maximumExtent = max((layerExtent.xMaximum()-layerExtent.xMinimum()),(layerExtent.yMaximum()-layerExtent.yMinimum()))
+        
+        maxValueScale = self.parameterAsInt(parameters,self.MAX_VALUE_SCALE,context)
+        maxWidthScale = self.parameterAsInt(parameters,self.MAX_WIDTH_SCALE,context)
+        
+        feedback.pushInfo("      • maximumExtent :    {0}".format(maximumExtent))        
+
+        crsString = geometryLayer.crs().authid() 
+        # extract coordinates of the centroid of the geometryLayer as a dictionary
+        coordinatesDictionnary = {}
+        features = geometryLayer.getFeatures()
+        for elem in features:
+            centroid = elem.geometry().centroid().asPoint()
+            IDvalue = elem.attributes()[codgeoIndex]
+            coordinatesDictionnary[IDvalue] = centroid
+
+        originField = self.parameterAsString(parameters, self.ORIGIN , context)
+        originFieldIndex = inputTable.fields().indexOf(originField)
+        feedback.pushInfo("      • origine :    {0}, [{1}]".format(originField,originFieldIndex+1))
+        
+        destinationField = self.parameterAsString(parameters, self.DESTINATION , context)
+        destinationFieldIndex = inputTable.fields().indexOf(destinationField)
+        feedback.pushInfo("      • destination :    {0}, [{1}]".format(destinationField,destinationFieldIndex+1))
+        
+        valueField = self.parameterAsString(parameters, self.STOCK , context)
+        valueFieldIndex = inputTable.fields().indexOf(valueField)
+        feedback.pushInfo("      • effectifs :    {0}, [{1}]".format(valueField,valueFieldIndex+1))
+
+        minValue = self.parameterAsDouble(parameters, self.MIN_FLOW , context)
+        feedback.pushInfo("      • Valeur minimale :    {0} individu(s)".format(minValue))
+        maxDistanceKM = self.parameterAsDouble(parameters, self.MAX_DIST , context)
+        feedback.pushInfo("      • Distance maximale :    {0} km".format(maxDistanceKM))
+
+        vl = QgsVectorLayer("LineString?crs="+crsString, "temp", 'memory')
+        pr = vl.dataProvider()
+        pr.addAttributes([(QgsField("ORIGINE", QVariant.String)),
+                          (QgsField("DEST", QVariant.String)),
+                          (QgsField("FLUX", QVariant.Double)),
+                          (QgsField("DIST_KM", QVariant.Double))])
+        vl.updateFields() 
+        
+        notInLayer = 0
+        
+        maxValue = max([abs(item.attributes()[valueFieldIndex]) for item in inputTable.getFeatures()])
+
+        if maxValueScale ==0:
+            self.maxValue = maxValue
+        else: 
+            self.maxValue = maxValueScale
+            
+        # self.maxWidth = (maximumExtent**(.5))*15
+        feedback.pushInfo("      • valeur maximale :    {0}".format(maxValue))
+        for elem in inputTable.getFeatures():
+            value = float(elem.attributes()[valueFieldIndex])
+            pointA = coordinatesDictionnary[elem.attributes()[originFieldIndex]]
+            pointB = coordinatesDictionnary[elem.attributes()[destinationFieldIndex]]
+            
+            if pointA != pointB and (value >= minValue or minValue ==0):
+            
+                line = (pointA,pointB)
+                d = QgsDistanceArea()
+                distance = d.measureLine(pointA,pointB)/1000
+                if (maxDistanceKM == 0 or distance <= maxDistanceKM):
+                    f = QgsFeature()
+                    f.setGeometry(QgsGeometry.fromPolylineXY(line))
+                    f.setAttributes([elem.attributes()[originFieldIndex],
+                                     elem.attributes()[destinationFieldIndex],
+                                     value,
+                                     distance])
+                    pr.addFeature(f)
+        vl.updateExtents() 
+        vl.renderer().symbol().setWidth(3)  
+        minDistance = min([abs(item.attributes()[3]) for item in vl.getFeatures()])*.8
+        # self.maxWidth = 1000*minDistance/3
+        if maxWidthScale ==0:
+            self.maxWidth = 1000*minDistance/3
+        else:
+            self.maxWidth = maxWidthScale
+            
+        project = QgsProject.instance()            
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxValue',self.maxValue)
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxWidth',self.maxWidth)
+        
+        feedback.pushInfo("     Échelle :    ")
+        feedback.pushInfo("      • valeur maximale :    {0}".format(self.maxValue))
+        feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth))
+        
+        shortLines = processing.run("thematic:shortenlines", 
+                                {'INPUT':vl,
+                                 'TARGET':direction,
+                                 'DISTANCE':minDistance,
+                                 'STOCK':'FLUX',
+                                 'OUTPUT_LAYER':'memory:'})        
+        
+        # Add features to the sink
+        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
+                                               vl.fields(), QgsWkbTypes.LineString, vl.crs())
+
+        features = shortLines['OUTPUT_LAYER'].getFeatures()
+
+        for feature in features:
+            sink.addFeature(feature, QgsFeatureSink.FastInsert)   
+        
+        self.dest_id  = dest_id
+
+
+
+
+        # Return the results of the algorithm. In this case our only result is
+        # the feature sink which contains the processed features, but some
+        # algorithms may return multiple feature sinks, calculated numeric
+        # statistics, etc. These should all be included in the returned
+        # dictionary, with keys matching the feature corresponding parameter
+        # or output names.
+        return {self.OUTPUT_LAYER: dest_id}
+
+    def postProcessAlgorithm(self, context, feedback):
+        # Styling the arrows
+        output = QgsProcessingUtils.mapLayerFromString(self.dest_id, context)
+        path = os.path.dirname(__file__) + '/styles/saphir_arrows.qml'
+        output.loadNamedStyle(path)
+        
+        layerProperties = output.renderer().symbol().symbolLayers()[0].dataDefinedProperties()
+        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)'.format(self.maxValue, self.maxWidth)
+        # PropertyArrowWidth -> 44
+        layerProperties.property(44).setExpressionString(expressionString)
+        # PropertyArrowStartWidth -> 45
+        layerProperties.property(45).setExpressionString(expressionString)
+        
+        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)*0.8'.format(self.maxValue, self.maxWidth)
+        # PropertyArrowHeadLength -> 46
+        layerProperties.property(46).setExpressionString(expressionString)
+        # PropertyArrowHeadThickness -> 47
+        layerProperties.property(47).setExpressionString(expressionString)
+        
+        expressionString = '0)'
+        # PropertyOffset -> 7
+        layerProperties.property(7).setExpressionString(expressionString)        
+        
+        
+        output.triggerRepaint()
+        
+        return {self.OUTPUT_LAYER: self.dest_id}
+
+    def name(self):
+        """
+        Returns the algorithm name, used for identifying the algorithm. This
+        string should be fixed for the algorithm, and must not be localised.
+        The name should be unique within each provider. Names should contain
+        lowercase alphanumeric characters only and no spaces or other
+        formatting characters.
+        """
+        return 'customsaphirarrows'
+
+    def displayName(self):
+        """
+        Returns the translated algorithm name, which should be used for any
+        user-visible display of the algorithm name.
+        """
+        return self.tr('Flèches saphir avec échelle personnalisée')
+
+    def group(self):
+        """
+        Returns the name of the group this algorithm belongs to. This string
+        should be localised.
+        """
+        return self.tr('Flux')
+
+    def groupId(self):
+        """
+        Returns the unique ID of the group this algorithm belongs to. This
+        string should be fixed for the algorithm, and must not be localised.
+        The group id should be unique within each provider. Group id should
+        contain lowercase alphanumeric characters only and no spaces or other
+        formatting characters.
+        """
+        return 'flows'
+
+    def tr(self, string):
+        return QCoreApplication.translate('Processing', string)
+
+    def createInstance(self):
+        return CreateCustomSaphirArrowsAlgorithm()
 
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/saphir.png')

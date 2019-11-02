@@ -43,7 +43,10 @@ from .CirclesAlgorithms import FormatProportionalSymbolsLegendAlgorithm
 from .FlowsAlgorithms import CreateLinesAlgorithm
 from .FlowsAlgorithms import ShortenLinesAlgorithm
 from .FlowsAlgorithms import CreateArrowsAlgorithm
+from .FlowsAlgorithms import CreateCustomArrowsAlgorithm
 from .FlowsAlgorithms import CreateSaphirArrowsAlgorithm
+from .FlowsAlgorithms import CreateCustomSaphirArrowsAlgorithm
+
 import os
 from qgis.PyQt.QtGui import QIcon
 
@@ -63,7 +66,9 @@ class ThematicProvider(QgsProcessingProvider):
                         CreateLinesAlgorithm(),
                         ShortenLinesAlgorithm(),
                         CreateArrowsAlgorithm(),
-                        CreateSaphirArrowsAlgorithm()]
+                        CreateCustomArrowsAlgorithm(),
+                        CreateSaphirArrowsAlgorithm(),
+                        CreateCustomSaphirArrowsAlgorithm()]
 
     def unload(self):
         """

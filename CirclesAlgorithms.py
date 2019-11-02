@@ -132,7 +132,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
             )
         )
         
-        self.shapes = [self.tr('Cerles'), self.tr('Losanges'), self.tr('Carrés')]
+        self.shapes = [self.tr('Cercles'), self.tr('Losanges'), self.tr('Carrés')]
         self.addParameter(QgsProcessingParameterEnum(
                 self.SHAPE,
                 self.tr('Type de représentation'),
@@ -366,7 +366,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
             xLegend = source.sourceExtent().xMaximum()+maxRadius0
             yLegend = (source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2
             legendCoords = str(xLegend)+','+str(yLegend)
-            result2 = processing.run("thematic:createcircleslegend", 
+            result2 = processing.run("thematic:proportionalsymbolslegend", 
                         {'SHAPE':representation,
                         'MAX_VALUE':val1,
                         'MAX_RADIUS':maxRadius0,
@@ -778,7 +778,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
             xLegend = source.sourceExtent().xMaximum()+maxRadius
             yLegend = (source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2
             legendCoords = str(xLegend)+','+str(yLegend)           
-            result2 = processing.run("thematic:createcircleslegend", 
+            result2 = processing.run("thematic:proportionalsymbolslegend", 
                         {'SHAPE':representation0,
                          'MAX_VALUE':maxValue,
                          'MAX_RADIUS':maxRadius,
