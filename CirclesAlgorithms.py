@@ -116,7 +116,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr('Input layer'),
+                self.tr('Fond en entrée'),
                 [QgsProcessing.TypeVectorPolygon,QgsProcessing.TypeVectorPoint],
                 optional=False
             )
@@ -124,7 +124,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                         
         self.addParameter(QgsProcessingParameterField(
                 self.COLUMN,
-                self.tr('Value to represent'),
+                self.tr('Variable de stock/effectifs'),
                 None,
                 self.INPUT,
                 QgsProcessingParameterField.Numeric,
@@ -132,10 +132,10 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
             )
         )
         
-        self.shapes = [self.tr('Circles'), self.tr('Diamons'), self.tr('Squares')]
+        self.shapes = [self.tr('Cerles'), self.tr('Losanges'), self.tr('Carrés')]
         self.addParameter(QgsProcessingParameterEnum(
                 self.SHAPE,
-                self.tr('Type of representation'),
+                self.tr('Type de représentation'),
                 options=self.shapes
             )
         )         
@@ -143,7 +143,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.ANALYSIS_LAYER,
-                self.tr('Polygon layer used for an automatic scale'),
+                self.tr('Contour du territoire d''analyse'),
                 [QgsProcessing.TypeVectorPolygon],
                 optional=False
             )
@@ -151,7 +151,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         
         self.addParameter(
             QgsProcessingParameterBoolean(self.LEGEND,
-                self.tr('Add an automatic legend layer'),
+                self.tr('Ajouter une légende'),
                 defaultValue=True))
                 
             
@@ -177,14 +177,14 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT, 
-                self.tr('Output layer'), 
+                self.tr('Symboles proportionnels'), 
                 type=QgsProcessing.TypeVectorPolygon
             )
         ) 
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT2, 
-                self.tr('Legend layer'), 
+                self.tr('Légende'), 
                 type=QgsProcessing.TypeVectorPolygon
             )
         )         
@@ -560,7 +560,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr('Input layer'),
+                self.tr('Fond en entrée'),
                 [QgsProcessing.TypeVectorPolygon,QgsProcessing.TypeVectorPoint],
                 optional=False
             )
@@ -569,7 +569,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
                         
         self.addParameter(QgsProcessingParameterField(
                 self.COLUMN,
-                self.tr('Value to represent'),
+                self.tr('Variable de stock/effectifs'),
                 None,
                 self.INPUT,
                 QgsProcessingParameterField.Numeric,
@@ -578,10 +578,10 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         )
 
         
-        self.shapes = [self.tr('Circles'), self.tr('Diamons'), self.tr('Squares')]
+        self.shapes = [self.tr('Cercles'), self.tr('Losanges'), self.tr('Carrés')]
         self.addParameter(QgsProcessingParameterEnum(
                 self.SHAPE,
-                self.tr('Type of representation'),
+                self.tr('Type de représentation'),
                 options=self.shapes,
                 defaultValue=representation
             )
@@ -591,7 +591,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.MAX_VALUE,
-                self.tr('Max value'),
+                self.tr('Valeur maximale à représenter'),
                 minValue=0,
                 defaultValue = maxValue,
                 optional=False
@@ -601,7 +601,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.MAX_RADIUS,
-                self.tr('Max radius (in meters)'),
+                self.tr('Rayon/demi diagonale/demi côté (en mètres)'),
                 minValue=0,
                 defaultValue=maxRadius,
                 optional=False
@@ -611,7 +611,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         
         self.addParameter(
             QgsProcessingParameterBoolean(self.LEGEND,
-                self.tr('Add an automatic legend layer'),
+                self.tr('Ajouter une légende'),
                 defaultValue=True))                
             
         # We add a feature sink in which to store our processed features (this
@@ -635,14 +635,14 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT, 
-                self.tr('Output layer'), 
+                self.tr('Symboles proportionnels'), 
                 type=QgsProcessing.TypeVectorPolygon
             )
         )         
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT2, 
-                self.tr('Legend layer'), 
+                self.tr('Légende'), 
                 type=QgsProcessing.TypeVectorPolygon
             )
         )
@@ -965,10 +965,10 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
             maxRadius = 0
             representation = 0
             
-        self.shapes = [self.tr('Circles'), self.tr('Diamons'), self.tr('Squares')]
+        self.shapes = [self.tr('Cercles'), self.tr('Losanges'), self.tr('Carrés')]
         self.addParameter(QgsProcessingParameterEnum(
                 self.SHAPE,
-                self.tr('Type of representation'),
+                self.tr('Type de représentation'),
                 defaultValue = representation,
                 options=self.shapes
             )
@@ -978,27 +978,27 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.MAX_VALUE,
-                self.tr('Max value'),
+                self.tr('Valeur maximale'),
                 minValue=0,
                 defaultValue = maxValue,
-                optional=False
+                optional=True
             )
         )
         
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.MAX_RADIUS,
-                self.tr('Max radius (in meters)'),
+                self.tr('Rayon/demi diagonale/demi-côté (en mètres)'),
                 minValue=0,
                 defaultValue = maxRadius,
-                optional=False
+                optional=True
             )
         )
         
         self.addParameter(
             QgsProcessingParameterString(
                 self.VALUES_LIST,
-                self.tr('List of values to represent'),
+                self.tr('Liste des valeurs à représenter (séparés par un ;'),
                 optional=True
             )
         )
@@ -1009,7 +1009,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         params.append(
             QgsProcessingParameterString(
                 self.XY_LEGEND,
-                self.tr('Position of the legend X,Y'),
+                self.tr('Position X,Y de la légende'),
                 optional=True
             )
         )
@@ -1033,7 +1033,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT, 
-                self.tr('Legend layer'), 
+                self.tr('Légende'), 
                 type=QgsProcessing.TypeVectorPolygon
             )
         )        
@@ -1261,7 +1261,7 @@ class FormatProportionalSymbolsLegendAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr('Input layer'),
+                self.tr('Fond de légende'),
                 [QgsProcessing.TypeVectorPolygon,QgsProcessing.TypeVectorPoint],
                 optional=False
             )
@@ -1274,10 +1274,10 @@ class FormatProportionalSymbolsLegendAlgorithm(QgsProcessingAlgorithm):
         except:
             representation = 0
             
-        self.shapes = [self.tr('Circles'), self.tr('Diamons'), self.tr('Squares')]
+        self.shapes = [self.tr('Cercles'), self.tr('Losanges'), self.tr('Carrés')]
         self.addParameter(QgsProcessingParameterEnum(
                 self.SHAPE,
-                self.tr('Type of representation'),
+                self.tr('Type de représentation'),
                 defaultValue = representation,
                 options=self.shapes
             )

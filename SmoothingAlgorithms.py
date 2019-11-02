@@ -85,7 +85,7 @@ class CreateGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr('Input layer'),
+                self.tr('Fond en entrée'),
                 [QgsProcessing.TypeVectorPolygon]
             )
         ) 
@@ -93,7 +93,7 @@ class CreateGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.CELL_SIZE,
-                self.tr('Cell size (in meters)'),
+                self.tr('Maille du carreau (en mètres)'),
                 defaultValue=1000,
                 minValue=1,
                 optional=False
@@ -114,7 +114,7 @@ class CreateGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterVectorDestination(
                 self.OUTPUT_LAYER,
-                self.tr("Output layer")
+                self.tr("Fond carroyé")
             )
         )
             
@@ -316,7 +316,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr('Input layer'),
+                self.tr('Fond en entrée'),
                 [QgsProcessing.TypeVectorAnyGeometry]
             )
         )
@@ -327,7 +327,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                self.tr('Output layer')
+                self.tr('Output Layer')
             )
         )
 
@@ -445,7 +445,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr('Input layer'),
+                self.tr('Fond en entrée'),
                 [QgsProcessing.TypeVectorPolygon]
             )
         )
@@ -459,7 +459,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterEnum(
                 self.EXTENT,
-                self.tr('Extent'),
+                self.tr('Étendue'),
                 options=self.extentList
             )
         )
@@ -467,7 +467,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.CELL_SIZE,
-                self.tr('Cell size (in meters)'),
+                self.tr('Maille du carreau (en mètres)'),
                 defaultValue=1000,
                 minValue=1,
                 optional=False
@@ -488,7 +488,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterVectorDestination(
                 self.OUTPUT_LAYER,
-                self.tr("Output layer")
+                self.tr("Fond carroyé")
             )
         )
             
@@ -644,7 +644,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('Générer une grille Inspire à partir d''un fond vecteur')
+        return self.tr("Générer une grille Inspire à partir d'un fond vecteur")
 
     def group(self):
         """

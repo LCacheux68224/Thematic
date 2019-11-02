@@ -102,13 +102,13 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr('Input layer'),
+                self.tr('Table de flux'),
                 [QgsProcessing.TypeVector]
             )
         ) 
         self.addParameter(QgsProcessingParameterField(
                 self.ORIGIN,
-                self.tr('Origin'),
+                self.tr('Origine'),
                 None,
                 self.INPUT,
                 QgsProcessingParameterField.String,
@@ -126,7 +126,7 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
         )
         self.addParameter(QgsProcessingParameterField(
                 self.STOCK,
-                self.tr('Stock'),
+                self.tr('Variable de flux'),
                 None,
                 self.INPUT,
                 QgsProcessingParameterField.Numeric,
@@ -137,14 +137,14 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT2,
-                self.tr('Input layer 2'),
+                self.tr('Fond de géolocalisation'),
                 [QgsProcessing.TypeVectorPolygon,QgsProcessing.TypeVectorPoint],
             optional=False
             )
         ) 
         self.addParameter(QgsProcessingParameterField(
                 self.CODGEO,
-                self.tr('Geographic ID'),
+                self.tr('Identifiant géographique'),
                 None,
                 self.INPUT2,
                 QgsProcessingParameterField.String,
@@ -166,7 +166,7 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
         params.append(
             QgsProcessingParameterNumber(
                 self.MIN_FLOW,
-                self.tr('Min flow'),
+                self.tr('Flux minimun à représenter'),
                 defaultValue=0,
                 minValue=0,
                 optional=False
@@ -176,7 +176,7 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
         params.append(
             QgsProcessingParameterNumber(
                 self.MAX_DIST,
-                self.tr('Max distance (in km)'),
+                self.tr('Distance maximale des flux (en km)'),
                 defaultValue=0,
                 minValue=0,
                 optional=False
@@ -189,7 +189,7 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT_LAYER, 
-                self.tr('Output layer'), 
+                self.tr('Oursins'), 
                 type=QgsProcessing.TypeVectorPolygon
             )
         ) 
@@ -371,6 +371,7 @@ class ShortenLinesAlgorithm(QgsProcessingAlgorithm):
     INPUT = 'INPUT'
     DISTANCE = 'DISTANCE'
     TARGET = 'TARGET'
+    STOCK = 'STOCK'
 
     def initAlgorithm(self, config):
         """
@@ -383,30 +384,39 @@ class ShortenLinesAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr('Input layer'),
+                self.tr('Fond d''oursins'),
                 [QgsProcessing.TypeVectorLine]
             )
         ) 
-        self.targetList = [self.tr('From origin'), self.tr('To destination')]
+        self.targetList = [self.tr('à partir de l''origine'), self.tr('à partir de la destination')]
         self.addParameter(QgsProcessingParameterEnum(
                 self.TARGET,
-                self.tr('Shorten...'),
+                self.tr('Couper les lignes...'),
                 defaultValue = 0,
                 options=self.targetList
             )
         )
         self.addParameter(QgsProcessingParameterNumber(
                 self.DISTANCE,
-                self.tr('Distance (in km)'),
+                self.tr('Distance (en km)'),
                 defaultValue=10,
                 minValue = 1,
                 optional=False
             )
         )
+        self.addParameter(QgsProcessingParameterField(
+                self.STOCK,
+                self.tr('Variable de stock/effectifs'),
+                None,
+                self.INPUT,
+                QgsProcessingParameterField.Numeric,
+                optional=True
+            )
+        )
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT_LAYER, 
-                self.tr('Output layer'), 
+                self.tr('Oursins réduits'), 
                 type=QgsProcessing.TypeVectorPolygon
             )
         ) 
@@ -438,7 +448,12 @@ class ShortenLinesAlgorithm(QgsProcessingAlgorithm):
                                                inputLayer.fields(), QgsWkbTypes.LineString, inputLayer.crs())             
 
         # features = result['OUTPUT'].getFeatures()
+        stockField = self.parameterAsString(parameters, self.STOCK , context)
+
         for feature in inputLayer.getFeatures():
+            if stockField != "":
+                stockFieldIndex = inputLayer.fields().indexOf(stockField)
+
             bufferCenter = QgsGeometry(feature.geometry().get()[target])          
             bufferPolygon = bufferCenter.buffer(radius*1000, 5)
             intersectLine = QgsGeometry.intersection(feature.geometry(), bufferPolygon)
@@ -530,13 +545,13 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr('Input layer'),
+                self.tr('Table de flux'),
                 [QgsProcessing.TypeVector]
             )
         ) 
         self.addParameter(QgsProcessingParameterField(
                 self.ORIGIN,
-                self.tr('Origin'),
+                self.tr('Origine'),
                 None,
                 self.INPUT,
                 QgsProcessingParameterField.String,
@@ -554,7 +569,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         )
         self.addParameter(QgsProcessingParameterField(
                 self.STOCK,
-                self.tr('Stock'),
+                self.tr('Variable de flux'),
                 None,
                 self.INPUT,
                 QgsProcessingParameterField.Numeric,
@@ -565,14 +580,14 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT2,
-                self.tr('Input layer 2'),
+                self.tr('Fond de géolocalisation'),
                 [QgsProcessing.TypeVectorPolygon,QgsProcessing.TypeVectorPoint],
             optional=False
             )
         ) 
         self.addParameter(QgsProcessingParameterField(
                 self.CODGEO,
-                self.tr('Geographic ID'),
+                self.tr('Identifiant géographique'),
                 None,
                 self.INPUT2,
                 QgsProcessingParameterField.String,
@@ -594,7 +609,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         params.append(
             QgsProcessingParameterNumber(
                 self.MIN_FLOW,
-                self.tr('Min flow'),
+                self.tr('Flux minimum à représenter'),
                 defaultValue=0,
                 minValue=0,
                 optional=False
@@ -604,7 +619,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         params.append(
             QgsProcessingParameterNumber(
                 self.MAX_DIST,
-                self.tr('Max distance (in km)'),
+                self.tr('Distance maximale des flux (en km)'),
                 defaultValue=0,
                 minValue=0,
                 optional=False
@@ -617,7 +632,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT_LAYER, 
-                self.tr('Output layer'), 
+                self.tr('Flèches'), 
                 type=QgsProcessing.TypeVectorPolygon
             )
         ) 
@@ -800,3 +815,327 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
 
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/iconFlechesJoignantes.png')
+
+class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
+    """
+    This is an example algorithm that takes a vector layer and
+    creates a new identical one.
+
+    It is meant to be used as an example of how to create your own
+    algorithms and explain methods and variables used to do it. An
+    algorithm like this will be available in all elements, and there
+    is not need for additional work.
+
+    All Processing algorithms should extend the QgsProcessingAlgorithm
+    class.
+    """
+
+    # Constants used to refer to parameters and outputs. They will be
+    # used when calling the algorithm from another algorithm, or when
+    # calling from the QGIS console.
+
+    OUTPUT_LAYER = 'OUTPUT_LAYER'
+    INPUT = 'INPUT'
+    ORIGIN = 'ORIGIN'
+    DESTINATION = 'DESTINATION'
+    STOCK = 'STOCK'
+    INPUT2 = 'INPUT2'
+    DIRECTION = 'DIRECTION'
+    MIN_FLOW = 'MIN_FLOW'
+    MAX_DIST = 'MAX_DIST'
+    CODGEO = 'CODGEO'
+    
+
+    def initAlgorithm(self, config):
+        """
+        Here we define the inputs and output of the algorithm, along
+        with some other properties.
+        """
+
+        # We add the input vector features source. It can have any kind of
+        # geometry.
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT,
+                self.tr('Table de flux'),
+                [QgsProcessing.TypeVector]
+            )
+        ) 
+        self.addParameter(QgsProcessingParameterField(
+                self.ORIGIN,
+                self.tr('Origine'),
+                None,
+                self.INPUT,
+                QgsProcessingParameterField.String,
+                False
+            )
+        )
+        self.addParameter(QgsProcessingParameterField(
+                self.DESTINATION,
+                self.tr('Destination'),
+                None,
+                self.INPUT,
+                QgsProcessingParameterField.String,
+                False
+            )
+        )
+        self.addParameter(QgsProcessingParameterField(
+                self.STOCK,
+                self.tr('Variable de flux'),
+                None,
+                self.INPUT,
+                QgsProcessingParameterField.Numeric,
+                optional=True
+            )
+        )
+        self.shapes = [self.tr('Entrante / solde'), self.tr('Sortante')]
+        self.addParameter(QgsProcessingParameterEnum(
+                self.DIRECTION,
+                self.tr('Direction des flux'),
+                defaultValue = 0,
+                options=self.shapes
+            )
+        ) 
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT2,
+                self.tr('Fond de géolocalisation'),
+                [QgsProcessing.TypeVectorPolygon,QgsProcessing.TypeVectorPoint],
+            optional=False
+            )
+        ) 
+        self.addParameter(QgsProcessingParameterField(
+                self.CODGEO,
+                self.tr('Identifiant géographique'),
+                None,
+                self.INPUT2,
+                QgsProcessingParameterField.String,
+                False
+            )
+        )
+        # We add a feature sink in which to store our processed features (this
+        # usually takes the form of a newly created vector layer when the
+        # algorithm is run in QGIS).
+
+        params = []
+        params.append(
+            QgsProcessingParameterNumber(
+                self.MIN_FLOW,
+                self.tr('Flux minimum à représenter'),
+                defaultValue=0,
+                minValue=0,
+                optional=False
+            )
+        )
+        
+        params.append(
+            QgsProcessingParameterNumber(
+                self.MAX_DIST,
+                self.tr('Distance maximale des flux (en km)'),
+                defaultValue=0,
+                minValue=0,
+                optional=False
+            )
+        )    
+        for param in params:
+            param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
+            self.addParameter(param)
+        
+        self.addParameter(
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT_LAYER, 
+                self.tr('Flèches'), 
+                type=QgsProcessing.TypeVectorPolygon
+            )
+        ) 
+            
+    def processAlgorithm(self, parameters, context, feedback):
+        """
+        Here is where the processing itself takes place.
+        """
+
+        # Retrieve the feature source and sink. The 'dest_id' variable is used
+        # to uniquely identify the feature sink, and must be included in the
+        # dictionary returned by the processAlgorithm function.
+        
+        # INPUT = parameters[self.INPUT]
+        # print(self.INPUT.extent())
+        # print(INPUT)
+        
+        # definition : flowList(self, flowTable, indexOrigin, indexDestination, indexValue, coordinatesDictionnary, minValue, maxDistance)
+        # self.flowList(inputTable, originIndex, destinationIndex, valueIndex, coordinates, minValue, maxDistanceKM)
+        
+        
+        inputTable = self.parameterAsSource(parameters, self.INPUT, context).materialize(QgsFeatureRequest())
+        direction = self.parameterAsInt( parameters, self.DIRECTION, context )
+        geographicIdName = self.parameterAsString(parameters, self.CODGEO , context)
+        geometryLayer = self.parameterAsSource(parameters, self.INPUT2, context).materialize(QgsFeatureRequest())         
+        codgeoIndex = geometryLayer.fields().indexOf(geographicIdName)
+        layerExtent = geometryLayer.extent()
+        maximumExtent = max((layerExtent.xMaximum()-layerExtent.xMinimum()),(layerExtent.yMaximum()-layerExtent.yMinimum()))
+        
+        feedback.pushInfo("      • maximumExtent :    {0}".format(maximumExtent))        
+
+        crsString = geometryLayer.crs().authid() 
+        # extract coordinates of the centroid of the geometryLayer as a dictionary
+        coordinatesDictionnary = {}
+        features = geometryLayer.getFeatures()
+        for elem in features:
+            centroid = elem.geometry().centroid().asPoint()
+            IDvalue = elem.attributes()[codgeoIndex]
+            coordinatesDictionnary[IDvalue] = centroid
+
+        originField = self.parameterAsString(parameters, self.ORIGIN , context)
+        originFieldIndex = inputTable.fields().indexOf(originField)
+        feedback.pushInfo("      • origine :    {0}, [{1}]".format(originField,originFieldIndex+1))
+        
+        destinationField = self.parameterAsString(parameters, self.DESTINATION , context)
+        destinationFieldIndex = inputTable.fields().indexOf(destinationField)
+        feedback.pushInfo("      • destination :    {0}, [{1}]".format(destinationField,destinationFieldIndex+1))
+        
+        valueField = self.parameterAsString(parameters, self.STOCK , context)
+        valueFieldIndex = inputTable.fields().indexOf(valueField)
+        feedback.pushInfo("      • effectifs :    {0}, [{1}]".format(valueField,valueFieldIndex+1))
+
+        minValue = self.parameterAsDouble(parameters, self.MIN_FLOW , context)
+        feedback.pushInfo("      • Valeur minimale :    {0} individu(s)".format(minValue))
+        maxDistanceKM = self.parameterAsDouble(parameters, self.MAX_DIST , context)
+        feedback.pushInfo("      • Distance maximale :    {0} km".format(maxDistanceKM))
+
+        vl = QgsVectorLayer("LineString?crs="+crsString, "temp", 'memory')
+        pr = vl.dataProvider()
+        pr.addAttributes([(QgsField("ORIGINE", QVariant.String)),
+                          (QgsField("DEST", QVariant.String)),
+                          (QgsField("FLUX", QVariant.Double)),
+                          (QgsField("DIST_KM", QVariant.Double))])
+        vl.updateFields() 
+        
+        notInLayer = 0
+        
+        maxValue = max([abs(item.attributes()[valueFieldIndex]) for item in inputTable.getFeatures()])
+
+        self.maxValue = maxValue
+        # self.maxWidth = (maximumExtent**(.5))*15
+        feedback.pushInfo("      • valeur maximale :    {0}".format(maxValue))
+        for elem in inputTable.getFeatures():
+            value = float(elem.attributes()[valueFieldIndex])
+            pointA = coordinatesDictionnary[elem.attributes()[originFieldIndex]]
+            pointB = coordinatesDictionnary[elem.attributes()[destinationFieldIndex]]
+            
+            if pointA != pointB and (value >= minValue or minValue ==0):
+            
+                line = (pointA,pointB)
+                d = QgsDistanceArea()
+                distance = d.measureLine(pointA,pointB)/1000
+                if (maxDistanceKM == 0 or distance <= maxDistanceKM):
+                    f = QgsFeature()
+                    f.setGeometry(QgsGeometry.fromPolylineXY(line))
+                    f.setAttributes([elem.attributes()[originFieldIndex],
+                                     elem.attributes()[destinationFieldIndex],
+                                     value,
+                                     distance])
+                    pr.addFeature(f)
+        vl.updateExtents() 
+        vl.renderer().symbol().setWidth(3)  
+        minDistance = min([abs(item.attributes()[3]) for item in vl.getFeatures()])*.8
+        self.maxWidth = 1000*minDistance/3
+        feedback.pushInfo(self.tr('     • Dist mini : {0}'.format(minDistance)))
+        shortLines = processing.run("thematic:shortenlines", 
+                                {'INPUT':vl,
+                                 'TARGET':direction,
+                                 'DISTANCE':minDistance,
+                                 'STOCK':'FLUX',
+                                 'OUTPUT_LAYER':'memory:'})        
+        
+        # Add features to the sink
+        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
+                                               vl.fields(), QgsWkbTypes.LineString, vl.crs())
+
+        features = shortLines['OUTPUT_LAYER'].getFeatures()
+
+        for feature in features:
+            sink.addFeature(feature, QgsFeatureSink.FastInsert)   
+        
+        self.dest_id  = dest_id
+
+
+
+
+        # Return the results of the algorithm. In this case our only result is
+        # the feature sink which contains the processed features, but some
+        # algorithms may return multiple feature sinks, calculated numeric
+        # statistics, etc. These should all be included in the returned
+        # dictionary, with keys matching the feature corresponding parameter
+        # or output names.
+        return {self.OUTPUT_LAYER: dest_id}
+
+    def postProcessAlgorithm(self, context, feedback):
+        # Styling the arrows
+        output = QgsProcessingUtils.mapLayerFromString(self.dest_id, context)
+        path = os.path.dirname(__file__) + '/styles/saphir_arrows.qml'
+        output.loadNamedStyle(path)
+        
+        layerProperties = output.renderer().symbol().symbolLayers()[0].dataDefinedProperties()
+        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)'.format(self.maxValue, self.maxWidth)
+        # PropertyArrowWidth -> 44
+        layerProperties.property(44).setExpressionString(expressionString)
+        # PropertyArrowStartWidth -> 45
+        layerProperties.property(45).setExpressionString(expressionString)
+        
+        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)*0.8'.format(self.maxValue, self.maxWidth)
+        # PropertyArrowHeadLength -> 46
+        layerProperties.property(46).setExpressionString(expressionString)
+        # PropertyArrowHeadThickness -> 47
+        layerProperties.property(47).setExpressionString(expressionString)
+        
+        expressionString = '0)'
+        # PropertyOffset -> 7
+        layerProperties.property(7).setExpressionString(expressionString)        
+        
+        
+        output.triggerRepaint()
+        
+        return {self.OUTPUT_LAYER: self.dest_id}
+
+    def name(self):
+        """
+        Returns the algorithm name, used for identifying the algorithm. This
+        string should be fixed for the algorithm, and must not be localised.
+        The name should be unique within each provider. Names should contain
+        lowercase alphanumeric characters only and no spaces or other
+        formatting characters.
+        """
+        return 'saphirarrows'
+
+    def displayName(self):
+        """
+        Returns the translated algorithm name, which should be used for any
+        user-visible display of the algorithm name.
+        """
+        return self.tr('Flèches saphir')
+
+    def group(self):
+        """
+        Returns the name of the group this algorithm belongs to. This string
+        should be localised.
+        """
+        return self.tr('Flux')
+
+    def groupId(self):
+        """
+        Returns the unique ID of the group this algorithm belongs to. This
+        string should be fixed for the algorithm, and must not be localised.
+        The group id should be unique within each provider. Group id should
+        contain lowercase alphanumeric characters only and no spaces or other
+        formatting characters.
+        """
+        return 'flows'
+
+    def tr(self, string):
+        return QCoreApplication.translate('Processing', string)
+
+    def createInstance(self):
+        return CreateSaphirArrowsAlgorithm()
+
+    def icon(self):
+        return QIcon(os.path.dirname(__file__) + '/images/saphir.png')
