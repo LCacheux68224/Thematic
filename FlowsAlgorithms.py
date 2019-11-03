@@ -707,6 +707,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         pr.addAttributes([(QgsField("ORIGINE", QVariant.String)),
                           (QgsField("DEST", QVariant.String)),
                           (QgsField("FLUX", QVariant.Double)),
+                          (QgsField("WIDTH", QVariant.Double)),
                           (QgsField("DIST_KM", QVariant.Double))])
         vl.updateFields() 
         
@@ -715,7 +716,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         maxValue = max([abs(item.attributes()[valueFieldIndex]) for item in inputTable.getFeatures()]) 
 
         self.maxValue = maxValue
-        self.maxWidth = (maximumExtent**(.5))*15
+        self.maxWidth = (maximumExtent**(.5))*30
             
         project = QgsProject.instance()            
         QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxValue',self.maxValue)
@@ -740,8 +741,11 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
                     f.setAttributes([elem.attributes()[originFieldIndex],
                                      elem.attributes()[destinationFieldIndex],
                                      value, 
+                                     abs(value)*self.maxWidth/self.maxValue,
                                      distance])
                     pr.addFeature(f)
+                    
+                    # 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)'.format(self.maxValue, self.maxWidth)
         vl.updateExtents() 
         vl.renderer().symbol().setWidth(3)        
         # Add features to the sink
@@ -773,19 +777,22 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         output.loadNamedStyle(path)
         
         layerProperties = output.renderer().symbol().symbolLayers()[0].dataDefinedProperties()
-        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)'.format(self.maxValue, self.maxWidth)
+        expressionString = '"WIDTH"'
+        # expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)'.format(self.maxValue, self.maxWidth)
         # PropertyArrowWidth -> 44
         layerProperties.property(44).setExpressionString(expressionString)
         # PropertyArrowStartWidth -> 45
         layerProperties.property(45).setExpressionString(expressionString)
         
-        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)*0.8'.format(self.maxValue, self.maxWidth)
+        expressionString = '"WIDTH"*0.8'.format(self.maxValue, self.maxWidth)
+        # expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)*0.8'.format(self.maxValue, self.maxWidth)
+        
         # PropertyArrowHeadLength -> 46
         layerProperties.property(46).setExpressionString(expressionString)
         # PropertyArrowHeadThickness -> 47
         layerProperties.property(47).setExpressionString(expressionString)
         
-        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)'.format(self.maxValue, self.maxWidth)
+        expressionString = '"WIDTH"'.format(self.maxValue, self.maxWidth)
         # PropertyOffset -> 7
         layerProperties.property(7).setExpressionString(expressionString)        
         
@@ -1055,6 +1062,7 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
         pr.addAttributes([(QgsField("ORIGINE", QVariant.String)),
                           (QgsField("DEST", QVariant.String)),
                           (QgsField("FLUX", QVariant.Double)),
+                          (QgsField("WIDTH", QVariant.Double)),
                           (QgsField("DIST_KM", QVariant.Double))])
         vl.updateFields() 
         
@@ -1066,7 +1074,7 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
         else: 
             self.maxValue = maxValueScale
         if maxWidthScale ==0:
-            self.maxWidth = (maximumExtent**(.5))*15
+            self.maxWidth = (maximumExtent**(.5))*30
         else:
             self.maxWidth = maxWidthScale
             
@@ -1093,6 +1101,7 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
                     f.setAttributes([elem.attributes()[originFieldIndex],
                                      elem.attributes()[destinationFieldIndex],
                                      value, 
+                                     abs(value)*self.maxWidth/self.maxValue,
                                      distance])
                     pr.addFeature(f)
         vl.updateExtents() 
@@ -1126,21 +1135,24 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
         output.loadNamedStyle(path)
         
         layerProperties = output.renderer().symbol().symbolLayers()[0].dataDefinedProperties()
-        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)'.format(self.maxValue, self.maxWidth)
+        expressionString = '"WIDTH"'
+        # expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)'.format(self.maxValue, self.maxWidth)
         # PropertyArrowWidth -> 44
         layerProperties.property(44).setExpressionString(expressionString)
         # PropertyArrowStartWidth -> 45
         layerProperties.property(45).setExpressionString(expressionString)
         
-        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)*0.8'.format(self.maxValue, self.maxWidth)
+        expressionString = '"WIDTH"*0.8'.format(self.maxValue, self.maxWidth)
+        # expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)*0.8'.format(self.maxValue, self.maxWidth)
+        
         # PropertyArrowHeadLength -> 46
         layerProperties.property(46).setExpressionString(expressionString)
         # PropertyArrowHeadThickness -> 47
         layerProperties.property(47).setExpressionString(expressionString)
         
-        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)'.format(self.maxValue, self.maxWidth)
+        expressionString = '"WIDTH"'.format(self.maxValue, self.maxWidth)
         # PropertyOffset -> 7
-        layerProperties.property(7).setExpressionString(expressionString)        
+        layerProperties.property(7).setExpressionString(expressionString)      
         
         
         output.triggerRepaint()
