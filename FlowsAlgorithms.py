@@ -1418,10 +1418,11 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
 
         self.maxValue = maxValue
 
-            
+        self.maxLength = minDistance*1000
         project = QgsProject.instance()            
         QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxValue',self.maxValue)
         QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxWidth',self.maxWidth)
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxLength',self.maxLength)
         
         feedback.pushInfo("     Échelle :    ")
         feedback.pushInfo("      • valeur maximale :    {0}".format(self.maxValue))
@@ -1526,7 +1527,8 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
 
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/saphir.png')
-        
+
+
 class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
     """
     This is an example algorithm that takes a vector layer and
@@ -1556,6 +1558,7 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
     MAX_DIST = 'MAX_DIST'
     MAX_VALUE_SCALE = 'MAX_VALUE_SCALE'
     MAX_WIDTH_SCALE = 'MAX_WIDTH_SCALE'
+    MAX_LENGTH_SCALE = 'MAX_LENGTH_SCALE'
     CODGEO = 'CODGEO'
     
 
@@ -1570,9 +1573,11 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         try:
             maxValue = QgsExpressionContextUtils.projectScope(project).variable('thematic_arrowsMaxValue')
             maxWidth = QgsExpressionContextUtils.projectScope(project).variable('thematic_arrowsMaxWidth')
+            maxLength = QgsExpressionContextUtils.projectScope(project).variable('thematic_arrowsMaxLength')
         except:
             maxValue = 0
             maxWidth = 0
+            maxLength = 0
             
         # We add the input vector features source. It can have any kind of
         # geometry.
@@ -1657,7 +1662,15 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
                 optional=False
             )
         )
-
+        self.addParameter(
+            QgsProcessingParameterNumber(
+                self.MAX_LENGTH_SCALE,
+                self.tr('Longueur des flèches (en mètres)'),
+                defaultValue=maxLength,
+                minValue=0,
+                optional=False
+            )
+        )
         params = []
         params.append(
             QgsProcessingParameterNumber(
@@ -1719,6 +1732,7 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         
         maxValueScale = self.parameterAsInt(parameters,self.MAX_VALUE_SCALE,context)
         maxWidthScale = self.parameterAsInt(parameters,self.MAX_WIDTH_SCALE,context)
+        maxLengthScale = self.parameterAsInt(parameters,self.MAX_LENGTH_SCALE,context)
         
         feedback.pushInfo("      • maximumExtent :    {0}".format(maximumExtent))        
 
@@ -1794,18 +1808,25 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         else:
             self.maxWidth = maxWidthScale
             
+        if maxLengthScale == 0:
+            self.maxLength = minDistance
+        else:
+            self.maxLength = maxLengthScale
+            
         project = QgsProject.instance()            
         QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxValue',self.maxValue)
         QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxWidth',self.maxWidth)
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxLength',self.maxLength)
         
         feedback.pushInfo("     Échelle :    ")
         feedback.pushInfo("      • valeur maximale :    {0}".format(self.maxValue))
         feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth))
+        feedback.pushInfo("      • longueur des flèches :    {0} m".format(self.maxLength))
         
         shortLines = processing.run("thematic:shortenlines", 
                                 {'INPUT':vl,
                                  'TARGET':direction,
-                                 'DISTANCE':minDistance,
+                                 'DISTANCE':self.maxLength/1000,
                                  'STOCK':'FLUX',
                                  'OUTPUT_LAYER':'memory:'})        
         
