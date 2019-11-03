@@ -73,7 +73,7 @@ from qgis.PyQt.QtWidgets import *
 # import re
 
 # defaultMaxValue = 0
-# defaultMaxRadius = 0
+# defaultmaxWidth = 0
 # ---------------------------- #
 # Create proportional circles  #
 # ---------------------------- #
@@ -263,38 +263,60 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                         feedback = feedback)
         somme = summary['SUM']
         
-        maxRadius0 = 2*math.sqrt(abs(val1)*layerArea/(7*math.pi*somme))
-        radiusFormula = '2*sqrt(abs("{0}")*{1}/(7*pi()*{2}))'.format(stockValue, layerArea, summary['SUM'])
+        # Type of symbols
+        representation = self.parameterAsInt( parameters, self.SHAPE, context )
+
+        if self.parameterAsInt( parameters, self.SHAPE, context ) == 0:
+            # circles
+            representation0 = 2
+         
+            # diamètre
+            maxWidth = 2*math.sqrt(abs(val1)*layerArea/(7*math.pi*somme))
+            widthFormula = '2*sqrt(abs("{0}")*{1}/(7*pi()*{2}))'.format(stockValue, layerArea, summary['SUM']) 
+            
+        elif self.parameterAsInt( parameters, self.SHAPE, context ) == 1:
+            representation0 = 1
+
+            maxWidth = math.sqrt(2*abs(val1)*layerArea/(7*somme))
+            widthFormula = 'sqrt(2*abs("{0}")*{1}/(7*{2}))'.format(stockValue, layerArea, summary['SUM']) 
+            
+        else:
+            # squares
+            representation0 = 0
+
+            maxWidth = math.sqrt(abs(val1)*layerArea/(7*somme))
+            widthFormula = 'sqrt(abs("{0}")*{1}/(7*{2}))'.format(stockValue, layerArea, summary['SUM']) 
+
         
         # Check if variable names VAL, R and VARIABLE exist in attribute list - if TRUE then increment
         fieldList = [field.name() for field in source.fields()]    
         
-        valueName, radiusName, varName = 'VAL', 'R', 'VAR'
+        valueName, widthName, varName = 'VAL', 'WIDTH', 'VAR'
         i , iLabel = 0, ''
         while (valueName+iLabel) in fieldList \
-                or (radiusName+iLabel) in fieldList \
+                or (widthName+iLabel) in fieldList \
                 or (varName+iLabel) in fieldList:
             i += 1
             iLabel = '_'+str(i)
 
         valueName       += iLabel
-        radiusName      += iLabel
+        widthName      += iLabel
         varName         += iLabel
         
         # Ajout de la colonne R
-        radiusAttribute = processing.run("qgis:fieldcalculator", 
+        widthAttribute = processing.run("qgis:fieldcalculator", 
                         {'INPUT':source,
-                         'FIELD_NAME':radiusName,
+                         'FIELD_NAME':widthName,
                          'FIELD_TYPE':0,
                          'FIELD_LENGTH':10,
                          'FIELD_PRECISION':3,
                          'NEW_FIELD':True,
-                         'FORMULA':radiusFormula,
+                         'FORMULA':widthFormula,
                          'OUTPUT':'memory:'},
                           feedback=feedback)
         varTexte = u'if( \"{0}\" >= 0,\'1 - {0} > 0\',\'2 - {0} < 0\')'.format(stockValue)
         variableNameAttribute = processing.run("qgis:fieldcalculator", 
-                        {'INPUT':radiusAttribute['OUTPUT'],
+                        {'INPUT':widthAttribute['OUTPUT'],
                          'FIELD_NAME':varName,
                          'FIELD_TYPE':2,
                          'FIELD_LENGTH':len(varTexte),
@@ -305,17 +327,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                           feedback=feedback)
         # crs = source2.crs().authid()
 
-        # Type of symbols
-        representation = self.parameterAsInt( parameters, self.SHAPE, context )
 
-        if self.parameterAsInt( parameters, self.SHAPE, context ) == 0:
-            # circles
-            representation0 = 2
-        elif self.parameterAsInt( parameters, self.SHAPE, context ) == 1:
-            representation0 = 1
-        else:
-            # squares
-            representation0 = 0
             
         centroid = processing.run("native:centroids", 
                         {'INPUT':variableNameAttribute['OUTPUT'],
@@ -324,7 +336,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                           feedback = feedback)   
         sortedLayer = processing.run("native:orderbyexpression", 
                         {'INPUT': centroid['OUTPUT'],
-                         'EXPRESSION':'\"R\"',
+                         'EXPRESSION':'\"WIDTH\"',
                          'ASCENDING':False,
                          'NULLS_FIRST':False,
                          'OUTPUT':'memory:'})                             
@@ -333,8 +345,8 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         result = processing.run("qgis:rectanglesovalsdiamondsvariable",
                         {'INPUT': sortedLayer['OUTPUT'],
                          'SHAPE':representation0,
-                         'WIDTH':radiusName,
-                         'HEIGHT':radiusName,
+                         'WIDTH':widthName,
+                         'HEIGHT':widthName,
                          'ROTATION':None,
                          'SEGMENTS':36,
                          'OUTPUT':'memory:'},
@@ -356,20 +368,20 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo('')
         feedback.pushInfo(self.tr('   Échelle automatique :'))   
         feedback.pushInfo("      • Val :  {0}".format(val1))
-        feedback.pushInfo("      • R :    {0}".format(maxRadius0))  
+        feedback.pushInfo("      • Largeur :    {0}".format(maxWidth))  
         
         self.dest_id = dest_id
         self.varName = varName
 
         if automaticLegend:       
             # OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context) 
-            xLegend = source.sourceExtent().xMaximum()+maxRadius0
+            xLegend = source.sourceExtent().xMaximum()+maxWidth
             yLegend = (source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2
             legendCoords = str(xLegend)+','+str(yLegend)
             result2 = processing.run("thematic:proportionalsymbolslegend", 
                         {'SHAPE':representation,
                         'MAX_VALUE':val1,
-                        'MAX_RADIUS':maxRadius0,
+                        'MAX_WIDTH':maxWidth,
                         'VALUES_LIST':'',
                         'XY_LEGEND':legendCoords,
                         'OUTPUT':'memory:'},
@@ -398,7 +410,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
             feedback.pushInfo('')     
             project = QgsProject.instance()
             QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesMaxValue',val1)
-            QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesMaxRadius',maxRadius0)
+            QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesmaxWidth',maxWidth)
             QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesRepresentation',self.parameterAsInt( parameters, self.SHAPE, context ))
             self.dest_id2 =  None
             return {self.OUTPUT: 'dest_id'}
@@ -532,7 +544,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
     OUTPUT = 'OUTPUT'
     INPUT = 'INPUT'
     COLUMN = 'COLUMN'
-    MAX_RADIUS = 'MAX_RADIUS'
+    MAX_WIDTH = 'MAX_WIDTH'
     MAX_VALUE = 'MAX_VALUE'
     SHAPE = 'SHAPE'
     METHOD = 'METHOD'
@@ -548,11 +560,11 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
 
         try:
             maxValue = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesMaxValue')
-            maxRadius = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesMaxRadius')
+            maxWidth = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesmaxWidth')
             representation = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesRepresentation')
         except:
             maxValue = 0
-            maxRadius = 0
+            maxWidth = 0
             representation = 0
             
         # We add the input vector features source. It can have any kind of
@@ -600,10 +612,10 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         
         self.addParameter(
             QgsProcessingParameterNumber(
-                self.MAX_RADIUS,
-                self.tr('Rayon/demi diagonale/demi côté (en mètres)'),
+                self.MAX_WIDTH,
+                self.tr('Diamètre/diagonale/côté (en mètres)'),
                 minValue=0,
-                defaultValue=maxRadius,
+                defaultValue=maxWidth,
                 optional=False
             )
         )
@@ -674,42 +686,42 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         else :
             val3 = val2/3
         
-        maxRadius = self.parameterAsInt(parameters,self.MAX_RADIUS,context)
+        maxWidth = self.parameterAsInt(parameters,self.MAX_WIDTH,context)
         maxValue = self.parameterAsInt(parameters,self.MAX_VALUE,context)        
 
-        radiusFormula = '{0} * sqrt(abs("{1}")/{2})'.format(maxRadius,stockValue,maxValue)
+        widthFormula = '{0} * sqrt(abs("{1}")/{2})'.format(maxWidth,stockValue,maxValue)
           
         fieldList = [field.name() for field in source.fields()]    
         
-        valueName, radiusName, varName = 'VAL', 'R', 'VAR'
+        valueName, widthName, varName = 'VAL', 'WIDTH', 'VAR'
         i , iLabel = 0, ''
         while (valueName+iLabel) in fieldList \
-                or (radiusName+iLabel) in fieldList \
+                or (widthName+iLabel) in fieldList \
                 or (varName+iLabel) in fieldList:
             i += 1
             iLabel = '_'+str(i)
-            QgsMessageLog.logMessage("R : {0}".format(iLabel), 'Thematic Plugin', 0)
+            QgsMessageLog.logMessage("WIDTH : {0}".format(iLabel), 'Thematic Plugin', 0)
 
         valueName       += iLabel
-        radiusName      += iLabel
+        widthName      += iLabel
         varName    += iLabel
         
         self.varName = varName
         
         # Ajout de la colonne R
-        radiusAttribute = processing.run("qgis:fieldcalculator", 
+        widthAttribute = processing.run("qgis:fieldcalculator", 
                         {'INPUT':source,
-                         'FIELD_NAME':radiusName,
+                         'FIELD_NAME':widthName,
                          'FIELD_TYPE':0,
                          'FIELD_LENGTH':10,
                          'FIELD_PRECISION':3,
                          'NEW_FIELD':True,
-                         'FORMULA':radiusFormula,
+                         'FORMULA':widthFormula,
                          'OUTPUT':'memory:'},
                           feedback=feedback)
         varTexte = u'if( \"{0}\" >= 0,\'1 - {0} > 0\',\'2 - {0} < 0\')'.format(stockValue)
         variableNameAttribute = processing.run("qgis:fieldcalculator", 
-                        {'INPUT':radiusAttribute['OUTPUT'],
+                        {'INPUT':widthAttribute['OUTPUT'],
                          'FIELD_NAME':varName,
                          'FIELD_TYPE':2,
                          'FIELD_LENGTH':len(varTexte),
@@ -738,7 +750,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
                           feedback = feedback)   
         sortedLayer = processing.run("native:orderbyexpression", 
                         {'INPUT': centroid['OUTPUT'],
-                         'EXPRESSION':'\"R\"',
+                         'EXPRESSION':'\"WIDTH\"',
                          'ASCENDING':False,
                          'NULLS_FIRST':False,
                          'OUTPUT':'memory:'}) 
@@ -746,8 +758,8 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         result = processing.run("qgis:rectanglesovalsdiamondsvariable",
                         {'INPUT': sortedLayer['OUTPUT'],
                          'SHAPE':representation,
-                         'WIDTH':'R',
-                         'HEIGHT':'R',
+                         'WIDTH':'WIDTH',
+                         'HEIGHT':'WIDTH',
                          'ROTATION':None,
                          'SEGMENTS':36,
                          'OUTPUT':'memory:'},
@@ -771,17 +783,17 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo('')
         feedback.pushInfo(self.tr('    Échelle personnalisée :'))  
         feedback.pushInfo("      • Val :  {0}".format(maxValue))
-        feedback.pushInfo("      • R :    {0}".format(maxRadius))
+        feedback.pushInfo("      • Largeur :    {0}".format(maxWidth))
         
         if automaticLegend:       
             # OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context)
-            xLegend = source.sourceExtent().xMaximum()+maxRadius
+            xLegend = source.sourceExtent().xMaximum()+maxWidth
             yLegend = (source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2
             legendCoords = str(xLegend)+','+str(yLegend)           
             result2 = processing.run("thematic:proportionalsymbolslegend", 
                         {'SHAPE':representation0,
                          'MAX_VALUE':maxValue,
-                         'MAX_RADIUS':maxRadius,
+                         'MAX_WIDTH':maxWidth,
                          'VALUES_LIST':'',
                          'XY_LEGEND':legendCoords,
                          'OUTPUT':'memory:'},
@@ -810,9 +822,9 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
             feedback.pushInfo('')   
             project = QgsProject.instance()            
             QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesMaxValue',maxValue)
-            QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesMaxRadius',maxRadius)
+            QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesmaxWidth',maxWidth)
             QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesRepresentation',self.parameterAsInt( parameters, self.SHAPE, context ))      
-            
+            self.dest_id2 =  None            
             return {self.OUTPUT: 'dest_id'}        
 
 
@@ -943,7 +955,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
 
     OUTPUT = 'OUTPUT'
     COLUMNS = 'COLUMNS'
-    MAX_RADIUS = 'MAX_RADIUS'
+    MAX_WIDTH = 'MAX_WIDTH'
     MAX_VALUE = 'MAX_VALUE'
     VALUES_LIST = 'VALUES_LIST'
     XY_LEGEND = 'XY_LEGEND'
@@ -958,11 +970,11 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
 
         try:
             maxValue = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesMaxValue')
-            maxRadius = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesMaxRadius')
+            maxWidth = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesmaxWidth')
             representation = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesRepresentation')
         except:
             maxValue = 0
-            maxRadius = 0
+            maxWidth = 0
             representation = 0
             
         self.shapes = [self.tr('Cercles'), self.tr('Losanges'), self.tr('Carrés')]
@@ -987,10 +999,10 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         
         self.addParameter(
             QgsProcessingParameterNumber(
-                self.MAX_RADIUS,
-                self.tr('Rayon/demi diagonale/demi-côté (en mètres)'),
+                self.MAX_WIDTH,
+                self.tr('Diamètre/diagonale/côté (en mètres)'),
                 minValue=0,
-                defaultValue = maxRadius,
+                defaultValue = maxWidth,
                 optional=True
             )
         )
@@ -1059,7 +1071,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
             # squares
             representation = 0
 
-        maxRadius = self.parameterAsInt(parameters,self.MAX_RADIUS,context)
+        maxWidth = self.parameterAsInt(parameters,self.MAX_WIDTH,context)
         maxValue = self.parameterAsInt(parameters,self.MAX_VALUE,context)  
         valueList = self.parameterAsString(parameters, self.VALUES_LIST , context)
         legendCustomValues = valueList.strip().replace(';',' ').split()
@@ -1070,11 +1082,11 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(self.tr("     Échelle des symboles proportionnels :"))
         feedback.pushInfo('')    
         feedback.pushInfo(self.tr('     • Val : {0}'.format(maxValue)))   
-        feedback.pushInfo(self.tr('     • R : {0}'.format(maxRadius)))              
+        feedback.pushInfo(self.tr('     • Largeur : {0}'.format(maxWidth)))              
         feedback.pushInfo('')    
         
         QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesMaxValue',maxValue)
-        QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesMaxRadius',maxRadius)
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesmaxWidth',maxWidth)
  
         
         if len(coordsLegendText) >0 :
@@ -1088,17 +1100,14 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
             yLegend = (canevasExtent.yMaximum()+canevasExtent.yMinimum() )/2
   
 
-        coeff = maxRadius * (math.pi/maxValue)**.5
+        coeff = maxWidth * (math.pi/maxValue)**.5
         Value = maxValue
-        # radius = coeff * (Value/math.pi) ** .5
-        # dirpath = tempfile.mkdtemp()
-        # sortie = str(re.sub('\\\\','/',dirpath) + "/output.shp")
-        # feedback.pushInfo(self.tr('     fichier : {0}'.format(sortie)))          
+     
         vl = QgsVectorLayer("Point?crs=epsg:2154", "temp", 'memory')
         from qgis.PyQt.QtCore import QVariant
         pr = vl.dataProvider()
         pr.addAttributes([QgsField("VAL", QVariant.Double),
-                          QgsField("R",  QVariant.Double),
+                          QgsField("WIDTH",  QVariant.Double),
                           QgsField("SECT", QVariant.String)])
         vl.updateFields() 
         if len(legendCustomValues) == 0:
@@ -1107,15 +1116,15 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
             # legendCustomValues = sorted(legendCustomValues, reverse= True)
             legendCustomValues =sorted([float(item) for item in legendCustomValues ], reverse = True)
         for i in legendCustomValues:
-            radius = coeff * (i/math.pi) ** .5
+            width = coeff * (i/math.pi) ** .5
             f = QgsFeature()
             if representation == 0:
-                x = xLegend+maxRadius/2-radius/2
+                x = xLegend+maxWidth/2-width/2
             else :
                 x = xLegend
-            y = yLegend-maxRadius/2+radius/2
+            y = yLegend-maxWidth/2+width/2
             f.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(x,y)))
-            f.setAttributes([i, radius, "texte"])
+            f.setAttributes([i, width, "texte"])
             pr.addFeature(f)
         vl.updateExtents() 
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
@@ -1132,8 +1141,8 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         result = processing.run("qgis:rectanglesovalsdiamondsvariable",
                         {'INPUT': vl,
                          'SHAPE':representation,
-                         'WIDTH': 'R',
-                         'HEIGHT': 'R',
+                         'WIDTH': 'WIDTH',
+                         'HEIGHT': 'WIDTH',
                          'ROTATION':None,
                          'SEGMENTS':36,
                          'OUTPUT':'memory:'},
@@ -1177,7 +1186,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
     def shortHelpString(self):
         return self.tr("Légende pour les analyses en ronds.\n \n \
                        <h3>Échelle des ronds</h3> \n \
-                       L'échelle des ronds est défini par une valeur (généralement le maximum) associé au rayon correspondant \n \
+                       L'échelle des ronds est défini par une valeur (généralement le maximum) associé au diamètre correspondant \n \
                        <h3>Les valeurs à représenter</h4> \n \
                        Par défaut l'extension représente les valeurs \n -> MAX, MAX/3 et MAX/9\n \
                        Il est possible de personnaliser l'échelle en indiquant les valeurs que \
