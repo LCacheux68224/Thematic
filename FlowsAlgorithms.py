@@ -59,6 +59,7 @@ from qgis.core import (QgsProcessing,
                        QgsArrowSymbolLayer,
                        QgsSymbol,
                        QgsExpressionContextUtils,
+                       QgsProperty,
                        QgsWkbTypes)
 import processing
 
@@ -329,7 +330,7 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Flux')
+        return self.tr('Flux et déplacements')
 
     def groupId(self):
         """
@@ -486,7 +487,7 @@ class ShortenLinesAlgorithm(QgsProcessingAlgorithm):
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Flux')
+        return self.tr('Flux et déplacements')
 
     def groupId(self):
         """
@@ -823,7 +824,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Flux')
+        return self.tr('Flux et déplacements')
 
     def groupId(self):
         """
@@ -1181,7 +1182,7 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Flux')
+        return self.tr('Flux et déplacements')
 
     def groupId(self):
         """
@@ -1271,7 +1272,7 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
                 None,
                 self.INPUT,
                 QgsProcessingParameterField.Numeric,
-                optional=True
+                optional=False
             )
         )
         self.shapes = [self.tr('Entrante / solde'), self.tr('Sortante')]
@@ -1438,20 +1439,26 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         
         feedback.pushInfo("     Échelle :    ")
         feedback.pushInfo("      • valeur maximale :    {0}".format(self.maxValue))
-        feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth))
+        feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth))   
         
-        shortLines = processing.run("thematic:shortenlines", 
+        if direction == 0:
+            startDistance = 0
+            endDistance = minDistance*1000
+        else:
+            startDistance = QgsProperty.fromExpression('length( $geometry)-{0}*1000'.format(minDistance))
+            endDistance = QgsProperty.fromExpression('length( $geometry)')
+            
+        shortLines =processing.run("native:linesubstring", 
                                 {'INPUT':vl,
-                                 'TARGET':direction,
-                                 'DISTANCE':minDistance,
-                                 'STOCK':'FLUX',
-                                 'OUTPUT_LAYER':'memory:'})        
+                                 'START_DISTANCE':startDistance,
+                                 'END_DISTANCE':endDistance,
+                                 'OUTPUT':'memory:'})                         
         
         # Add features to the sink
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
                                                vl.fields(), QgsWkbTypes.LineString, vl.crs())
 
-        features = shortLines['OUTPUT_LAYER'].getFeatures()
+        features = shortLines['OUTPUT'].getFeatures()
 
         for feature in features:
             sink.addFeature(feature, QgsFeatureSink.FastInsert)   
@@ -1624,7 +1631,7 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
                 None,
                 self.INPUT,
                 QgsProcessingParameterField.Numeric,
-                optional=True
+                optional=False
             )
         )
         self.shapes = [self.tr('Entrante / solde'), self.tr('Sortante')]
@@ -1833,20 +1840,26 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo("     Échelle :    ")
         feedback.pushInfo("      • valeur maximale :    {0}".format(self.maxValue))
         feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth))
-        feedback.pushInfo("      • longueur des flèches :    {0} m".format(self.maxLength))
+        feedback.pushInfo("      • longueur des flèches :    {0} m".format(self.maxLength))   
         
-        shortLines = processing.run("thematic:shortenlines", 
+        if direction == 0:
+            startDistance = 0
+            endDistance = self.maxLength
+        else:
+            startDistance = QgsProperty.fromExpression('length( $geometry)-{0}'.format(self.maxLength))
+            endDistance = QgsProperty.fromExpression('length( $geometry)')
+
+        shortLines =processing.run("native:linesubstring", 
                                 {'INPUT':vl,
-                                 'TARGET':direction,
-                                 'DISTANCE':self.maxLength/1000,
-                                 'STOCK':'FLUX',
-                                 'OUTPUT_LAYER':'memory:'})        
+                                 'START_DISTANCE':startDistance,
+                                 'END_DISTANCE':endDistance,
+                                 'OUTPUT':'memory:'})                               
         
         # Add features to the sink
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
                                                vl.fields(), QgsWkbTypes.LineString, vl.crs())
 
-        features = shortLines['OUTPUT_LAYER'].getFeatures()
+        features = shortLines['OUTPUT'].getFeatures()
 
         for feature in features:
             sink.addFeature(feature, QgsFeatureSink.FastInsert)   
@@ -1914,7 +1927,7 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Flux')
+        return self.tr('Flux et déplacements')
 
     def groupId(self):
         """

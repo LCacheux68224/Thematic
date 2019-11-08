@@ -41,11 +41,11 @@ from .CirclesAlgorithms import CreateCirclesLegendAlgorithm
 from .CirclesAlgorithms import FormatProportionalSymbolsLegendAlgorithm
 
 from .FlowsAlgorithms import CreateLinesAlgorithm
-from .FlowsAlgorithms import ShortenLinesAlgorithm
 from .FlowsAlgorithms import CreateArrowsAlgorithm
 from .FlowsAlgorithms import CreateCustomArrowsAlgorithm
 from .FlowsAlgorithms import CreateSaphirArrowsAlgorithm
 from .FlowsAlgorithms import CreateCustomSaphirArrowsAlgorithm
+
 
 import os
 from qgis.PyQt.QtGui import QIcon
@@ -64,7 +64,6 @@ class ThematicProvider(QgsProcessingProvider):
                         CreateCirclesLegendAlgorithm(),
                         FormatProportionalSymbolsLegendAlgorithm(),
                         CreateLinesAlgorithm(),
-                        ShortenLinesAlgorithm(),
                         CreateArrowsAlgorithm(),
                         CreateCustomArrowsAlgorithm(),
                         CreateSaphirArrowsAlgorithm(),
@@ -77,13 +76,16 @@ class ThematicProvider(QgsProcessingProvider):
         """
         pass
 
+
     def loadAlgorithms(self):
         """
         Loads all algorithms belonging to this provider.
         """
+
         for alg in self.alglist:
             self.addAlgorithm( alg )
-
+            
+        
     def id(self):
         """
         Returns the unique provider id, used for identifying the provider. This

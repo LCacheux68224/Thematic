@@ -269,7 +269,7 @@ class CreateGridAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('Générer une grille à partir d''un fond vecteur')
+        return self.tr("Générer une grille de lissage BTB à partir d'un contour")
 
     def group(self):
         """
@@ -520,6 +520,8 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         if quantileList =='' :
             quantileList = 'NULL'
         
+        # Quantiles désactivés pour le moment
+        # quantileList == 'NULL'
 
         command = ['C:/Program Files/R/R-3.2.1/bin/x64/Rscript.exe','-e' ,'getRversion()']
 
@@ -557,7 +559,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
             # feedback.pushInfo("      • proc :    {0}".format(proc.stdout))  
             
             result = processing.run("native:joinattributestable", 
-                    {'INPUT':grid,'FIELD':'ID','INPUT_2':sortieLissage,'FIELD_2':'ID','FIELDS_TO_COPY':varList,'METHOD':1,'DISCARD_NONMATCHING':False,'PREFIX':'','OUTPUT':'memory:'})
+                    {'INPUT':grid,'FIELD':'ID','INPUT_2':sortieLissage,'FIELD_2':'ID','FIELDS_TO_COPY':[],'METHOD':1,'DISCARD_NONMATCHING':False,'PREFIX':'','OUTPUT':'memory:'})
 
         
         else:
@@ -628,7 +630,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('Lissage')
+        return self.tr('Lissage BTB (Beyond the Border)')
 
     def group(self):
         """
@@ -890,7 +892,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr("Générer une grille Inspire à partir d'un fond vecteur")
+        return self.tr("Générer une grille Inspire à partir d'un contour")
 
     def group(self):
         """

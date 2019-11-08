@@ -490,7 +490,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Symboles proportionnels')
+        return self.tr('Symboles proportionnels (Stocks et effectifs)')
 
     def groupId(self):
         """
@@ -902,7 +902,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Symboles proportionnels')
+        return self.tr('Symboles proportionnels (Stocks et effectifs)')
 
     def groupId(self):
         """
@@ -1217,7 +1217,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Symboles proportionnels')
+        return self.tr('Symboles proportionnels (Stocks et effectifs)')
 
     def groupId(self):
         """
@@ -1340,7 +1340,7 @@ class FormatProportionalSymbolsLegendAlgorithm(QgsProcessingAlgorithm):
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Symboles proportionnels')
+        return self.tr('Symboles proportionnels (Stocks et effectifs)')
 
     def groupId(self):
         """
