@@ -58,6 +58,7 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingUtils,
                        QgsArrowSymbolLayer,
                        QgsSymbol,
+                       QgsProcessingParameterBoolean,
                        QgsExpressionContextUtils,
                        QgsProperty,
                        QgsWkbTypes)
@@ -259,22 +260,26 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo("      • valeur maximale :    {0}".format(maxValue))
         for elem in inputTable.getFeatures():
             value = float(elem.attributes()[valueFieldIndex])
-            pointA = coordinatesDictionnary[elem.attributes()[originFieldIndex]]
-            pointB = coordinatesDictionnary[elem.attributes()[destinationFieldIndex]]
-            
-            if pointA != pointB and (value >= minValue or minValue ==0):
-            
-                line = (pointA,pointB)
-                d = QgsDistanceArea()
-                distance = d.measureLine(pointA,pointB)/1000
-                if (maxDistanceKM == 0 or distance <= maxDistanceKM):
-                    f = QgsFeature()
-                    f.setGeometry(QgsGeometry.fromPolylineXY(line))
-                    f.setAttributes([elem.attributes()[originFieldIndex],
-                                     elem.attributes()[destinationFieldIndex],
-                                     value, 
-                                     distance])
-                    pr.addFeature(f)
+            try:
+                pointA = coordinatesDictionnary[elem.attributes()[originFieldIndex]]
+                pointB = coordinatesDictionnary[elem.attributes()[destinationFieldIndex]]
+                
+                if pointA != pointB and (value >= minValue or minValue ==0):
+                
+                    line = (pointA,pointB)
+                    d = QgsDistanceArea()
+                    distance = d.measureLine(pointA,pointB)/1000
+                    if (maxDistanceKM == 0 or distance <= maxDistanceKM):
+                        f = QgsFeature()
+                        f.setGeometry(QgsGeometry.fromPolylineXY(line))
+                        f.setAttributes([elem.attributes()[originFieldIndex],
+                                         elem.attributes()[destinationFieldIndex],
+                                         value, 
+                                         distance])
+                        pr.addFeature(f)
+            except:
+                # commune manquante dans le fond de carte
+                pass
         vl.updateExtents() 
         vl.renderer().symbol().setWidth(3)        
         # Add features to the sink
@@ -535,7 +540,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
     MIN_FLOW = 'MIN_FLOW'
     MAX_DIST = 'MAX_DIST'
     CODGEO = 'CODGEO'
-    
+    SMART_ARROWS="SMART_ARROWS"
 
     def initAlgorithm(self, config):
         """
@@ -609,14 +614,12 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
         # algorithm is run in QGIS).
-        '''
+        
         self.addParameter(
-            QgsProcessingParameterFeatureSink(
-                self.OUTPUT,
-                self.tr('Output layer')
-            )
-        )
-        '''
+            QgsProcessingParameterBoolean(self.SMART_ARROWS,
+                self.tr('Flèches selon polygones'),
+                defaultValue=False))
+                
         params = []
         params.append(
             QgsProcessingParameterNumber(
@@ -678,13 +681,50 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         # feedback.pushInfo("      • maximumExtent :    {0}".format(maximumExtent))        
 
         crsString = geometryLayer.crs().authid() 
+        
+        if self.parameterAsBool(parameters,self.SMART_ARROWS,context):
+            buffer = processing.run("native:buffer", 
+                            {'INPUT':geometryLayer,
+                             'DISTANCE':QgsProperty.fromExpression(
+                                        '-sqrt(area($geometry)/(20*pi()))'),
+                             'SEGMENTS':5,
+                             'END_CAP_STYLE':0,
+                             'JOIN_STYLE':0,
+                             'MITER_LIMIT':2,
+                             'DISSOLVE':False,
+                             'OUTPUT':'memory:'},
+                         feedback = feedback)
+            singleParts = processing.run("native:multiparttosingleparts", 
+                            {'INPUT':buffer['OUTPUT'],
+                             'OUTPUT':'memory:'},
+                         feedback = feedback)
+            feedback.pushInfo("      • singleParts['OUTPUT'] :    {0}".format(singleParts))
+            feedback.pushInfo("      • geographicIdName :    {0}".format(geographicIdName))
+            sql = processing.run("qgis:executesql", 
+                            {'INPUT_DATASOURCES':singleParts['OUTPUT'],
+                             'INPUT_QUERY':'select *,max(st_area(geometry)) as area from input1 group by {0}'.format(geographicIdName),
+                             'INPUT_UID_FIELD':'',
+                             'INPUT_GEOMETRY_FIELD':'',
+                             'INPUT_GEOMETRY_TYPE':4,
+                             'INPUT_GEOMETRY_CRS':geometryLayer.crs(),
+                             'OUTPUT':'memory:'},
+                         feedback = feedback)
+                             
+
+                             
+            codgeoIndex = sql['OUTPUT'].fields().indexOf(geographicIdName)                             
+            features = sql['OUTPUT'].getFeatures()
+        else:
+            features = geometryLayer.getFeatures()
+            
         # extract coordinates of the centroid of the geometryLayer as a dictionary
         coordinatesDictionnary = {}
-        features = geometryLayer.getFeatures()
+
         for elem in features:
             centroid = elem.geometry().centroid().asPoint()
             IDvalue = elem.attributes()[codgeoIndex]
             coordinatesDictionnary[IDvalue] = centroid
+
         feedback.pushInfo("      Variables")
         originField = self.parameterAsString(parameters, self.ORIGIN , context)
         originFieldIndex = inputTable.fields().indexOf(originField)
@@ -728,32 +768,66 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth))
         for elem in inputTable.getFeatures():
             value = float(elem.attributes()[valueFieldIndex])
-            pointA = coordinatesDictionnary[elem.attributes()[originFieldIndex]]
-            pointB = coordinatesDictionnary[elem.attributes()[destinationFieldIndex]]
-            
-            if pointA != pointB and (value >= minValue or minValue ==0):
-            
-                line = (pointA,pointB)
-                d = QgsDistanceArea()
-                distance = d.measureLine(pointA,pointB)/1000
-                if (maxDistanceKM == 0 or distance <= maxDistanceKM):
-                    f = QgsFeature()
-                    f.setGeometry(QgsGeometry.fromPolylineXY(line))
-                    f.setAttributes([elem.attributes()[originFieldIndex],
-                                     elem.attributes()[destinationFieldIndex],
-                                     value, 
-                                     abs(value)*self.maxWidth/self.maxValue,
-                                     distance])
-                    pr.addFeature(f)
+            try:
+                pointA = coordinatesDictionnary[elem.attributes()[originFieldIndex]]
+                pointB = coordinatesDictionnary[elem.attributes()[destinationFieldIndex]]
+                
+                if pointA != pointB and (value >= minValue or minValue ==0):
+                
+                    line = (pointA,pointB)
+                    d = QgsDistanceArea()
+                    distance = d.measureLine(pointA,pointB)/1000
+                    if (maxDistanceKM == 0 or distance <= maxDistanceKM):
+                        f = QgsFeature()
+                        f.setGeometry(QgsGeometry.fromPolylineXY(line))
+                        f.setAttributes([elem.attributes()[originFieldIndex],
+                                         elem.attributes()[destinationFieldIndex],
+                                         value, 
+                                         abs(value)*self.maxWidth/self.maxValue,
+                                         distance])
+                        pr.addFeature(f)
+            except:
+                # commune non présente dans le fond de carte
+                pass
                     
                     # 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)'.format(self.maxValue, self.maxWidth)
         vl.updateExtents() 
         vl.renderer().symbol().setWidth(3)        
         # Add features to the sink
-        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
-                                               vl.fields(), QgsWkbTypes.LineString, vl.crs())
+        # (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
+        #                                        vl.fields(), QgsWkbTypes.LineString, vl.crs())
+                                               
 
-        features = vl.getFeatures()
+        if self.parameterAsBool(parameters,self.SMART_ARROWS,context):
+            lineOrigin = processing.run("qgis:executesql",
+                    {'INPUT_DATASOURCES':[vl,sql['OUTPUT']],
+                    'INPUT_QUERY':'select a.ORIGINE, a.DEST, a.FLUX, a.WIDTH, a.DIST_KM , st_difference(a.geometry, b.geometry) as geometry from input1 as a left join input2 as b on a.origine = b.{0}'.format(geographicIdName),
+                    'INPUT_UID_FIELD':'',
+                    'INPUT_GEOMETRY_FIELD':'',
+                    'INPUT_GEOMETRY_TYPE':4,
+                    'INPUT_GEOMETRY_CRS':geometryLayer.crs(),
+                    'OUTPUT':'memory:'})
+                    
+            lineDestination = processing.run("qgis:executesql",
+                    {'INPUT_DATASOURCES':[lineOrigin['OUTPUT'],sql['OUTPUT']],
+                    'INPUT_QUERY':'select a.ORIGINE, a.DEST, a.FLUX, a.WIDTH, a.DIST_KM , st_difference(a.geometry, b.geometry) as geometry from input1 as a left join input2 as b on a.dest = b.{0}'.format(geographicIdName),
+                    'INPUT_UID_FIELD':'',
+                    'INPUT_GEOMETRY_FIELD':'',
+                    'INPUT_GEOMETRY_TYPE':4,
+                    'INPUT_GEOMETRY_CRS':geometryLayer.crs(),
+                    'OUTPUT':'memory:'})
+                    
+            (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
+                                               lineDestination['OUTPUT'].fields(), QgsWkbTypes.LineString, lineDestination['OUTPUT'].crs())
+
+            features = lineDestination['OUTPUT'].getFeatures()
+
+        else:
+
+            (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
+                                                   vl.fields(), QgsWkbTypes.LineString, vl.crs())
+
+            features = vl.getFeatures()
 
         for feature in features:
             sink.addFeature(feature, QgsFeatureSink.FastInsert)   
@@ -875,7 +949,7 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
     MAX_VALUE_SCALE = 'MAX_VALUE_SCALE'
     MAX_WIDTH_SCALE = 'MAX_WIDTH_SCALE'
     CODGEO = 'CODGEO'
-    
+    SMART_ARROWS="SMART_ARROWS"
 
     def initAlgorithm(self, config):
         """
@@ -970,6 +1044,11 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
             )
         )
         
+        self.addParameter(
+            QgsProcessingParameterBoolean(self.SMART_ARROWS,
+                self.tr('Flèches selon polygones'),
+                defaultValue=False))
+                
         params = []
         params.append(
             QgsProcessingParameterNumber(
@@ -1033,7 +1112,44 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
         # feedback.pushInfo("      • maximumExtent :    {0}".format(maximumExtent))        
 
         crsString = geometryLayer.crs().authid() 
+        
+        if self.parameterAsBool(parameters,self.SMART_ARROWS,context):
+            buffer = processing.run("native:buffer", 
+                            {'INPUT':geometryLayer,
+                             'DISTANCE':QgsProperty.fromExpression(
+                                        '-sqrt(area($geometry)/(20*pi()))'),
+                             'SEGMENTS':5,
+                             'END_CAP_STYLE':0,
+                             'JOIN_STYLE':0,
+                             'MITER_LIMIT':2,
+                             'DISSOLVE':False,
+                             'OUTPUT':'memory:'},
+                         feedback = feedback)
+            singleParts = processing.run("native:multiparttosingleparts", 
+                            {'INPUT':buffer['OUTPUT'],
+                             'OUTPUT':'memory:'},
+                         feedback = feedback)
+            feedback.pushInfo("      • singleParts['OUTPUT'] :    {0}".format(singleParts))
+            feedback.pushInfo("      • geographicIdName :    {0}".format(geographicIdName))
+            sql = processing.run("qgis:executesql", 
+                            {'INPUT_DATASOURCES':singleParts['OUTPUT'],
+                             'INPUT_QUERY':'select *,max(st_area(geometry)) as area from input1 group by {0}'.format(geographicIdName),
+                             'INPUT_UID_FIELD':'',
+                             'INPUT_GEOMETRY_FIELD':'',
+                             'INPUT_GEOMETRY_TYPE':4,
+                             'INPUT_GEOMETRY_CRS':geometryLayer.crs(),
+                             'OUTPUT':'memory:'},
+                         feedback = feedback)
+                             
+
+                             
+            codgeoIndex = sql['OUTPUT'].fields().indexOf(geographicIdName)                             
+            features = sql['OUTPUT'].getFeatures()
+        else:
+            features = geometryLayer.getFeatures()
+            
         # extract coordinates of the centroid of the geometryLayer as a dictionary
+        
         coordinatesDictionnary = {}
         features = geometryLayer.getFeatures()
         for elem in features:
@@ -1088,31 +1204,62 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth))
         for elem in inputTable.getFeatures():
             value = float(elem.attributes()[valueFieldIndex])
-            pointA = coordinatesDictionnary[elem.attributes()[originFieldIndex]]
-            pointB = coordinatesDictionnary[elem.attributes()[destinationFieldIndex]]
-            
-            if pointA != pointB and (value >= minValue or minValue ==0):
-            
-                line = (pointA,pointB)
-                d = QgsDistanceArea()
-                distance = d.measureLine(pointA,pointB)/1000
-                if (maxDistanceKM == 0 or distance <= maxDistanceKM):
-                    f = QgsFeature()
-                    f.setGeometry(QgsGeometry.fromPolylineXY(line))
-                    f.setAttributes([elem.attributes()[originFieldIndex],
-                                     elem.attributes()[destinationFieldIndex],
-                                     value, 
-                                     abs(value)*self.maxWidth/self.maxValue,
-                                     distance])
-                    pr.addFeature(f)
+            try:
+                pointA = coordinatesDictionnary[elem.attributes()[originFieldIndex]]
+                pointB = coordinatesDictionnary[elem.attributes()[destinationFieldIndex]]
+                
+                if pointA != pointB and (value >= minValue or minValue ==0):
+                
+                    line = (pointA,pointB)
+                    d = QgsDistanceArea()
+                    distance = d.measureLine(pointA,pointB)/1000
+                    if (maxDistanceKM == 0 or distance <= maxDistanceKM):
+                        f = QgsFeature()
+                        f.setGeometry(QgsGeometry.fromPolylineXY(line))
+                        f.setAttributes([elem.attributes()[originFieldIndex],
+                                         elem.attributes()[destinationFieldIndex],
+                                         value, 
+                                         abs(value)*self.maxWidth/self.maxValue,
+                                         distance])
+                        pr.addFeature(f)
+            except:
+                # commune non présente dans le fond de carte
+                pass
+                
         vl.updateExtents() 
-        vl.renderer().symbol().setWidth(3)        
-        # Add features to the sink
-        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
-                                               vl.fields(), QgsWkbTypes.LineString, vl.crs())
+        vl.renderer().symbol().setWidth(3)   
+        
+        if self.parameterAsBool(parameters,self.SMART_ARROWS,context):
+            lineOrigin = processing.run("qgis:executesql",
+                    {'INPUT_DATASOURCES':[vl,sql['OUTPUT']],
+                    'INPUT_QUERY':'select a.ORIGINE, a.DEST, a.FLUX, a.WIDTH, a.DIST_KM , st_difference(a.geometry, b.geometry) as geometry from input1 as a left join input2 as b on a.origine = b.{0}'.format(geographicIdName),
+                    'INPUT_UID_FIELD':'',
+                    'INPUT_GEOMETRY_FIELD':'',
+                    'INPUT_GEOMETRY_TYPE':4,
+                    'INPUT_GEOMETRY_CRS':geometryLayer.crs(),
+                    'OUTPUT':'memory:'})
+                    
+            lineDestination = processing.run("qgis:executesql",
+                    {'INPUT_DATASOURCES':[lineOrigin['OUTPUT'],sql['OUTPUT']],
+                    'INPUT_QUERY':'select a.ORIGINE, a.DEST, a.FLUX, a.WIDTH, a.DIST_KM , st_difference(a.geometry, b.geometry) as geometry from input1 as a left join input2 as b on a.dest = b.{0}'.format(geographicIdName),
+                    'INPUT_UID_FIELD':'',
+                    'INPUT_GEOMETRY_FIELD':'',
+                    'INPUT_GEOMETRY_TYPE':4,
+                    'INPUT_GEOMETRY_CRS':geometryLayer.crs(),
+                    'OUTPUT':'memory:'})
+                    
+            (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
+                                               lineDestination['OUTPUT'].fields(), QgsWkbTypes.LineString, lineDestination['OUTPUT'].crs())
 
-        features = vl.getFeatures()
+            features = lineDestination['OUTPUT'].getFeatures()
 
+        else:
+
+            (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
+                                                   vl.fields(), QgsWkbTypes.LineString, vl.crs())
+
+            features = vl.getFeatures()
+            
         for feature in features:
             sink.addFeature(feature, QgsFeatureSink.FastInsert)   
         
@@ -1231,6 +1378,7 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
     MIN_FLOW = 'MIN_FLOW'
     MAX_DIST = 'MAX_DIST'
     CODGEO = 'CODGEO'
+
     
 
     def initAlgorithm(self, config):
@@ -1304,6 +1452,7 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         # usually takes the form of a newly created vector layer when the
         # algorithm is run in QGIS).
 
+
         params = []
         params.append(
             QgsProcessingParameterNumber(
@@ -1368,7 +1517,7 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         crsString = geometryLayer.crs().authid() 
         # extract coordinates of the centroid of the geometryLayer as a dictionary
         coordinatesDictionnary = {}
-        features = geometryLayer.getFeatures()
+
         for elem in features:
             centroid = elem.geometry().centroid().asPoint()
             IDvalue = elem.attributes()[codgeoIndex]
