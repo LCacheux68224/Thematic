@@ -30,7 +30,11 @@ __copyright__ = '(C) 2018 by Lionel Cacheux'
 
 __revision__ = '$Format:%H$'
 
+import os
+from qgis.PyQt.QtGui import QIcon
+
 from qgis.core import QgsProcessingProvider
+
 from .SmoothingAlgorithms import CreateGridAlgorithm
 from .SmoothingAlgorithms import CreateInspireGridAlgorithm
 from .SmoothingAlgorithms import SmoothToGridAlgorithm
@@ -46,28 +50,12 @@ from .FlowsAlgorithms import CreateCustomArrowsAlgorithm
 from .FlowsAlgorithms import CreateSaphirArrowsAlgorithm
 from .FlowsAlgorithms import CreateCustomSaphirArrowsAlgorithm
 
-
-import os
-from qgis.PyQt.QtGui import QIcon
-
 class ThematicProvider(QgsProcessingProvider):
 
     def __init__(self):
         QgsProcessingProvider.__init__(self)
 
-        # Load algorithms
-        self.alglist = [CreateGridAlgorithm(),
-                        SmoothToGridAlgorithm(),
-                        CreateInspireGridAlgorithm(),
-                        CreateAutomaticSymbolsAlgorithm(),
-                        CreateCustomSymbolsAlgorithm(),
-                        CreateCirclesLegendAlgorithm(),
-                        FormatProportionalSymbolsLegendAlgorithm(),
-                        CreateLinesAlgorithm(),
-                        CreateArrowsAlgorithm(),
-                        CreateCustomArrowsAlgorithm(),
-                        CreateSaphirArrowsAlgorithm(),
-                        CreateCustomSaphirArrowsAlgorithm()]
+
 
     def unload(self):
         """
@@ -81,9 +69,23 @@ class ThematicProvider(QgsProcessingProvider):
         """
         Loads all algorithms belonging to this provider.
         """
-
-        for alg in self.alglist:
-            self.addAlgorithm( alg )
+        # Load algorithms
+        
+        alglist = [CreateGridAlgorithm(),
+                   SmoothToGridAlgorithm(),
+                   CreateInspireGridAlgorithm(),
+                   CreateAutomaticSymbolsAlgorithm(),
+                   CreateCustomSymbolsAlgorithm(),
+                   CreateCirclesLegendAlgorithm(),
+                   FormatProportionalSymbolsLegendAlgorithm(),
+                   CreateLinesAlgorithm(),
+                   CreateArrowsAlgorithm(),
+                   CreateCustomArrowsAlgorithm(),
+                   CreateSaphirArrowsAlgorithm(),
+                   CreateCustomSaphirArrowsAlgorithm()]
+                       
+        for elem in alglist:
+            self.addAlgorithm(elem)
             
         
     def id(self):

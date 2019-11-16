@@ -46,10 +46,19 @@ if cmd_folder not in sys.path:
 class ThematicPlugin(object):
 
     def __init__(self):
+        # self.provider = ThematicProvider()        
+        # remplacé par
+        self.provider =  None
+        
+    def initProcessing(self):
+        """Init Processing provider for QGIS >= 3.8."""
         self.provider = ThematicProvider()
+        QgsApplication.processingRegistry().addProvider(self.provider)
 
     def initGui(self):
-        QgsApplication.processingRegistry().addProvider(self.provider)
+        # Ajout        
+        """Init Processing provider for QGIS >= 3.8."""
+        self.initProcessing()       
 
     def unload(self):
         QgsApplication.processingRegistry().removeProvider(self.provider)
