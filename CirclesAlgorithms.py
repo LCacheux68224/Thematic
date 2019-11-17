@@ -35,12 +35,9 @@ import os
 from PyQt5.QtGui import QIcon
 from qgis.core import (QgsProcessing,
                        QgsFeatureSink,
-                       QgsMessageLog,
-                       QgsLogger,
                        QgsFeatureRequest,
                        QgsWkbTypes,
                        QgsProcessingParameterBoolean,
-                       QgsProcessingParameterVectorDestination,
                        QgsProcessingParameterDefinition,
                        QgsProcessingParameterNumber,
                        QgsProcessingParameterField,
@@ -49,33 +46,24 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterFeatureSource,
                        QgsProcessingParameterString,
                        QgsProcessingParameterFeatureSink,
-                       QgsProcessingParameterBoolean,
                        QgsVectorLayer,
-                       QgsProcessingParameterDistance,
                        QgsField,
                        QgsFeature,
                        QgsGeometry,
                        QgsPointXY,
-                       QgsProject,
-                       QgsVectorFileWriter,
                        QgsExpressionContextUtils,
                        QgsProcessingUtils,
-                       QgsProcessingException,
-                       QgsFillSymbol,
                        QgsSymbol,
                        QgsSimpleFillSymbolLayer,
                        QgsRendererCategory,
                        QgsCategorizedSymbolRenderer,
                        QgsProject)
+
 from qgis.utils import iface
 import processing , math
 from qgis.PyQt.QtGui import *
 from qgis.PyQt.QtWidgets import *
-# import tempfile
-# import re
 
-# defaultMaxValue = 0
-# defaultmaxWidth = 0
 # ---------------------------- #
 # Create proportional circles  #
 # ---------------------------- #
@@ -252,6 +240,11 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
             maxWidth = math.sqrt(abs(val1)*layerArea/(7*somme))
             widthFormula = 'sqrt(abs("{0}")*{1}/(7*{2}))'.format(stockValue, layerArea, summary['SUM']) 
         
+        project = QgsProject.instance()
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesMaxValue',val1)
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesmaxWidth',maxWidth)
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesRepresentation',representation)
+        
         # Test if the new attributes allready exists in attribute table
         fieldList = [field.name() for field in source.fields()]    
         
@@ -335,9 +328,9 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         
         self.dest_id = dest_id
         self.varName = varName
-
+        
         if addLegend:       
-            # OUTPUT2 = self.parameterAsOutputLayer(parameters,self.OUTPUT2,context) 
+            
             xLegend = source.sourceExtent().xMaximum()+maxWidth
             yLegend = (source.sourceExtent().yMinimum()+source.sourceExtent().yMaximum())/2
             legendCoords = str(xLegend)+','+str(yLegend)
@@ -362,7 +355,8 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
                                                result2['OUTPUT'].fields(), QgsWkbTypes.Polygon, result2['OUTPUT'].crs())        
             features = result2['OUTPUT'].getFeatures()
             for feature in features:
-                sink2.addFeature(feature, QgsFeatureSink.FastInsert)     
+                sink2.addFeature(feature, QgsFeatureSink.FastInsert)
+                
             # to get hold of the layer in post processing for styling the legend
             self.dest_id2=dest_id2
             self.representation = representation
@@ -371,10 +365,7 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
             feedback.pushInfo(self.tr('   Légende non demandée'))   
             feedback.pushInfo('____________________')
             feedback.pushInfo('')
-            project = QgsProject.instance()
-            QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesMaxValue',val1)
-            QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesmaxWidth',maxWidth)
-            QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesRepresentation',representation)
+            
             self.dest_id2 =  None
             return {self.OUTPUT: 'dest_id'}
     
@@ -518,11 +509,12 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         with some other properties.
         """
         project = QgsProject.instance()
+        maxValue = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesMaxValue')
 
         try:
             maxValue = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesMaxValue')
             maxWidth = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesmaxWidth')
-            representation = abs(QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesRepresentation')-2)
+            representation = abs(int(QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesRepresentation'))-2)
         except:
             maxValue = 1
             maxWidth = 1
@@ -919,7 +911,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         try:
             maxValue = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesMaxValue')
             maxWidth = QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesmaxWidth')
-            representation = abs(QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesRepresentation')-2)
+            representation = abs(int(QgsExpressionContextUtils.projectScope(project).variable('thematic_circlesRepresentation'))-2)
         except:
             # if not
             maxValue = 1
