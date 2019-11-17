@@ -35,7 +35,7 @@ from qgis.PyQt.QtGui import QIcon
 
 from qgis.core import QgsProcessingProvider
 
-from .SmoothingAlgorithms import CreateGridAlgorithm
+from .SmoothingAlgorithms import CreateBtbGridAlgorithm
 from .SmoothingAlgorithms import CreateInspireGridAlgorithm
 from .SmoothingAlgorithms import SmoothToGridAlgorithm
 
@@ -71,7 +71,7 @@ class ThematicProvider(QgsProcessingProvider):
         """
         # Load algorithms
         
-        alglist = [CreateGridAlgorithm(),
+        alglist = [CreateBtbGridAlgorithm(),
                    SmoothToGridAlgorithm(),
                    CreateInspireGridAlgorithm(),
                    CreateAutomaticSymbolsAlgorithm(),

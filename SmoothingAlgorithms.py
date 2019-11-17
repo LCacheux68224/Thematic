@@ -70,7 +70,7 @@ import locale
 # Create a grid from a layer  #
 # --------------------------- #
 
-class CreateGridAlgorithm(QgsProcessingAlgorithm):
+class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
     """
     This is an example algorithm that takes a vector layer and
     creates a new identical one.
@@ -121,18 +121,11 @@ class CreateGridAlgorithm(QgsProcessingAlgorithm):
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
         # algorithm is run in QGIS).
-        '''
-        self.addParameter(
-            QgsProcessingParameterFeatureSink(
-                self.OUTPUT,
-                self.tr('Output layer')
-            )
-        )
-        '''
+
         self.addParameter(
             QgsProcessingParameterVectorDestination(
                 self.OUTPUT_LAYER,
-                self.tr("Fond carroyé")
+                self.tr("Grille BTB")
             )
         )
             
@@ -145,17 +138,12 @@ class CreateGridAlgorithm(QgsProcessingAlgorithm):
         # to uniquely identify the feature sink, and must be included in the
         # dictionary returned by the processAlgorithm function.
         
-        # INPUT = parameters[self.INPUT]
-        # print(self.INPUT.extent())
-        # print(INPUT)
         source = self.parameterAsSource(parameters, self.INPUT, context)
         source2 = source.materialize(QgsFeatureRequest())
         crs = source2.crs().authid()
-
-
         
         OUTPUT_LAYER = self.parameterAsOutputLayer(parameters,self.OUTPUT_LAYER,context)
-        QgsMessageLog.logMessage("output layer : {0}".format(OUTPUT_LAYER), 'Thematic Plugin', 0)
+        
         CELL_SIZE = self.parameterAsInt( parameters, self.CELL_SIZE, context )
         # Layer extent
         layerExtent = source2.extent()
@@ -166,12 +154,14 @@ class CreateGridAlgorithm(QgsProcessingAlgorithm):
         
         # layerExtentList = [xmin,xmax,ymin,ymax]
         layerExtent = "{0},{1},{2},{3}".format(xmin,xmax,ymin,ymax)
-        QgsMessageLog.logMessage("Layer extent : {0}".format(layerExtent), 'Thematic Plugin', 0)
-        QgsMessageLog.logMessage("Source CRS : {0}".format(dir(crs)), 'Thematic Plugin', 0)
-        
-        # sourceCrsTexte = str(source.sourceCrs().epsg())
-        # print(layerExtent)
-        # Creation de la grille
+        feedback.pushInfo('____________________')
+        feedback.pushInfo('')
+        feedback.pushInfo(self.tr("Création d'une grille BTB"))
+        feedback.pushInfo('')    
+        feedback.pushInfo(self.tr('     • Contour : {0}'.format(source.sourceName())))
+        feedback.pushInfo(self.tr('     • Maille : {0} m'.format(CELL_SIZE)))
+        feedback.pushInfo(self.tr('     • Étendue de la couche : {0}'.format(layerExtent)))
+        feedback.pushInfo(self.tr('     • SCR : {0}'.format(crs)))
         
         grille = processing.run("qgis:creategrid", 
                         {'TYPE':2,
@@ -182,14 +172,14 @@ class CreateGridAlgorithm(QgsProcessingAlgorithm):
                          'VOVERLAY':0,
                          'CRS':crs,
                          'OUTPUT':'memory:'},
-                         feedback=feedback)
+                         feedback=None)
         
         # Selection des carreaux utiles
         processing.run("native:selectbylocation", 
                 {'INPUT':grille['OUTPUT'],
                  'PREDICATE':[0],
                  'INTERSECT':source2,
-                 'METHOD':0},feedback=feedback)
+                 'METHOD':0},feedback=None)
                             
         # On ne garde que les carreaux selectionnes
         result1 = processing.run("native:saveselectedfeatures", 
@@ -215,45 +205,10 @@ class CreateGridAlgorithm(QgsProcessingAlgorithm):
                                  'precision': 0, 
                                  'type': 2}],
                          'OUTPUT':OUTPUT_LAYER},
-                         feedback=feedback)
-        QgsMessageLog.logMessage("result : {0}".format(result2['OUTPUT']), 'Thematic Plugin', 0)                         
-                
-
-        return {self.OUTPUT_LAYER: 'OUTPUT_LAYER'}
-        # iface.addVectorLayer("C:/temp/grille.gpkg", "", "ogr")
-
-        # processing.run("qgis:creategrid", {'TYPE':2,'EXTENT':'99217.0,1242426.0,6049646.0,7110480.0 [EPSG:2154]','HSPACING':10000,'VSPACING':10000,'HOVERLAY':0,'VOVERLAY':0,'CRS':'EPSG:2154','OUTPUT':'memory:'})
+                         feedback=None)
         
-        '''
-            source = self.parameterAsSource(parameters, self.INPUT, context)
-            (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT,
-                    context, source.fields(), source.wkbType(), source.sourceCrs())
-
-            # Compute the number of steps to display within the progress bar and
-            # get features from source
-            total = 100.0 / source.featureCount() if source.featureCount() else 0
-            features = source.getFeatures()
-
-            for current, feature in enumerate(features):
-                # Stop the algorithm if cancel button has been clicked
-                if feedback.isCanceled():
-                    break
-
-                # Add a feature in the sink
-                sink.addFeature(feature, QgsFeatureSink.FastInsert)
-
-                # Update the progress bar
-                feedback.setProgress(int(current * total))
-
-            # Return the results of the algorithm. In this case our only result is
-            # the feature sink which contains the processed features, but some
-            # algorithms may return multiple feature sinks, calculated numeric
-            # statistics, etc. These should all be included in the returned
-            # dictionary, with keys matching the feature corresponding parameter
-            # or output names.
-            return {self.OUTPUT: dest_id}
-        '''
-
+        return {self.OUTPUT_LAYER: 'OUTPUT_LAYER'}
+    
     def name(self):
         """
         Returns the algorithm name, used for identifying the algorithm. This
@@ -262,7 +217,7 @@ class CreateGridAlgorithm(QgsProcessingAlgorithm):
         lowercase alphanumeric characters only and no spaces or other
         formatting characters.
         """
-        return 'creategrid'
+        return 'btbgrid'
 
     def displayName(self):
         """
@@ -292,7 +247,7 @@ class CreateGridAlgorithm(QgsProcessingAlgorithm):
         return QCoreApplication.translate('Processing', string)
 
     def createInstance(self):
-        return CreateGridAlgorithm()
+        return CreateBtbGridAlgorithm()
 
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/grid.png')
@@ -677,7 +632,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
     # used when calling the algorithm from another algorithm, or when
     # calling from the QGIS console.
 
-    OUTPUT_LAYER = 'OUTPUT_LAYER'
+    OUTPUT = 'OUTPUT'
     INPUT = 'INPUT'
     EXTENT = 'EXTENT'    
     CELL_SIZE = 'CELL_SIZE'
@@ -707,7 +662,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterEnum(
                 self.EXTENT,
-                self.tr('Étendue'),
+                self.tr('Localisation'),
                 options=self.extentList
             )
         )
@@ -725,18 +680,12 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
         # algorithm is run in QGIS).
-        '''
+        
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                self.tr('Output layer')
-            )
-        )
-        '''
-        self.addParameter(
-            QgsProcessingParameterVectorDestination(
-                self.OUTPUT_LAYER,
-                self.tr("Fond carroyé")
+                self.tr("Grille Inspire"), 
+                type=QgsProcessing.TypeVectorPolygon
             )
         )
             
@@ -756,24 +705,26 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         source2 = source.materialize(QgsFeatureRequest())
         crs = source2.crs().authid()
         extentZone = str(self.parameterAsString(parameters, self.EXTENT , context))
+        CELL_SIZE = self.parameterAsInt( parameters, self.CELL_SIZE, context )
+        # OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)
         
         crsList = {"0": "3035", "1": "5490", "2":"2975", "3":"2972", "4":"4471", "5":"4467", "6":"4467"}
         crsCode = crsList[extentZone]
-        # QgsMessageLog.logMessage("crs zone : {0}".format(crsCode), 'Thematic Plugin', 0)
-        feedback.pushInfo(self.tr("Zone EPSG:{0}".format(crsCode)))
-
-        # QgsMessageLog.logMessage("CRS : {0}".format(crs), 'Thematic Plugin', 0)
+        feedback.pushInfo('____________________')
+        feedback.pushInfo('')
+        feedback.pushInfo(self.tr("Création d'une grille Inspire"))
+        feedback.pushInfo('')    
+        feedback.pushInfo(self.tr('     • Contour : {0}'.format(source.sourceName())))
+        feedback.pushInfo(self.tr('     • Maille : {0} m'.format(CELL_SIZE)))
+        
         temp1 = processing.run("native:reprojectlayer", 
                     {'INPUT':source2,
                     'TARGET_CRS':QgsCoordinateReferenceSystem('EPSG:'+crsCode),
                     'OUTPUT':'memory:'},
-                     feedback=feedback)
-        # QgsMessageLog.logMessage("temporary output layer : {0}".format(temp1), 'Thematic Plugin', 0)
+                     feedback=None)
 
         layerExtent = temp1['OUTPUT'].extent()    
-        OUTPUT_LAYER = self.parameterAsOutputLayer(parameters,self.OUTPUT_LAYER,context)
-        # QgsMessageLog.logMessage("output layer : {0}".format(OUTPUT_LAYER), 'Thematic Plugin', 0)
-        CELL_SIZE = self.parameterAsInt( parameters, self.CELL_SIZE, context )
+
         # Layer extent
         # layerExtent = source2.extent()
         xmin = (math.floor(layerExtent.xMinimum()/CELL_SIZE)*CELL_SIZE)
@@ -783,13 +734,14 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         
         # layerExtentList = [xmin,xmax,ymin,ymax]
         layerExtent = "{0},{1},{2},{3}".format(xmin,xmax,ymin,ymax)
-        QgsMessageLog.logMessage("Layer extent : {0}".format(layerExtent), 'Thematic Plugin', 0)
-        QgsMessageLog.logMessage("CELL_SIZE : {0}".format(CELL_SIZE), 'Thematic Plugin', 0)
         
-        # sourceCrsTexte = str(source.sourceCrs().epsg())
-        # print(layerExtent)
+        feedback.pushInfo(self.tr('     • Étendue de la couche : {0}'.format(layerExtent)))
+        feedback.pushInfo(self.tr("     • Zone EPSG : {0}".format(crsCode)))
+        feedback.pushInfo('')
+
+        
         # Creation de la grille
-        feedback.pushInfo(self.tr("Génération de la grille"))
+        feedback.pushDebugInfo(self.tr("Création de la grille..."))
         grille = processing.run("qgis:creategrid", 
                         {'TYPE':2,
                          'EXTENT':layerExtent,
@@ -800,19 +752,23 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
                          'CRS':'EPSG:'+crsCode,
                          'OUTPUT':'memory:'},
                          feedback=feedback)
-        
+
+
         # Selection des carreaux utiles
-        feedback.pushInfo(self.tr("Suppression des carreaux inutiles"))
+        feedback.pushDebugInfo(self.tr("Nettoyage de la grille..."))
         processing.run("native:selectbylocation", 
-                {'INPUT':grille['OUTPUT'],
-                 'PREDICATE':[0],
-                 'INTERSECT':temp1['OUTPUT'],
-                 'METHOD':0},feedback=feedback)
-                            
+                        {'INPUT':grille['OUTPUT'],
+                         'PREDICATE':[0],
+                         'INTERSECT':temp1['OUTPUT'],
+                         'METHOD':0},
+                         feedback=feedback)
+
         # On ne garde que les carreaux selectionnes
         result1 = processing.run("native:saveselectedfeatures", 
             {'INPUT':grille['OUTPUT'],
             'OUTPUT':'memory:'})
+        
+            
         refactorfieldsExpression = "'CRS" + crsCode + "RES"+ str(CELL_SIZE) + "mN'" + ' + to_string("bottom") + ' + "'E'" + ' + to_string("left")' 
         refactorfieldsExpression_1k = "'CRS" + crsCode + "RES"+ str('1000') + "mN'" + ' + to_string(1000*to_int(floor("bottom"/1000))) + ' + "'E'" + ' + to_string(1000*to_int(floor("left"/1000)))' 
         refactorfieldsExpression_2k = "'CRS" + crsCode + "RES"+ str('2000') + "mN'" + ' + to_string(2000*floor("bottom"/2000)) + ' + "'E'" + ' + to_string(2000*floor("left"/2000))' 
@@ -820,63 +776,37 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         refactorfieldsExpression_8k = "'CRS" + crsCode + "RES"+ str('8000') + "mN'" + ' + to_string(8000*floor("bottom"/8000)) + ' + "'E'" + ' + to_string(8000*floor("left"/8000))' 
         refactorfieldsExpression_16k = "'CRS" + crsCode + "RES"+ str('16000') + "mN'" + ' + to_string(16000*floor("bottom"/16000)) + ' + "'E'" + ' + to_string(16000*floor("left"/16000))' 
         refactorfieldsExpression_32k = "'CRS" + crsCode + "RES"+ str('32000') + "mN'" + ' + to_string(32000*floor("bottom"/32000)) + ' + "'E'" + ' + to_string(32000*floor("left"/32000))' 
-
-		
-        # QgsMessageLog.logMessage("expression : {0}".format(refactorfieldsExpression), 'Thematic Plugin', 0)
+        
         # Ajout des colonnes ID, x et y
-        feedback.pushInfo(self.tr("Ajout des identifiants des carreaux"))
+        feedback.pushDebugInfo(self.tr("Ajout des identifiants Inspire..."))
         result2 = processing.run("qgis:refactorfields", 
                         {'INPUT':result1['OUTPUT'],
-                             'FIELDS_MAPPING':[{'expression': refactorfieldsExpression, 
+                             'FIELDS_MAPPING':[
+                                {'expression': refactorfieldsExpression, 
                                  'length': 30, 
                                  'name': 'idINSPIRE', 
                                  'precision': 0, 
                                  'type': 10},
-								 {'expression': refactorfieldsExpression_1k, 
+                                {'expression': refactorfieldsExpression_1k, 
                                  'length': 31, 
                                  'name': 'id_carr_1km', 
                                  'precision': 0, 
                                  'type': 10}],
-                         'OUTPUT':OUTPUT_LAYER},
-                         feedback=feedback)
-        # QgsMessageLog.logMessage("result : {0}".format(result2['OUTPUT']), 'Thematic Plugin', 0)                         
-                
-
-        return {self.OUTPUT_LAYER: 'OUTPUT_LAYER'}
-        # iface.addVectorLayer("C:/temp/grille.gpkg", "", "ogr")
-
-        # processing.run("qgis:creategrid", {'TYPE':2,'EXTENT':'99217.0,1242426.0,6049646.0,7110480.0 [EPSG:2154]','HSPACING':10000,'VSPACING':10000,'HOVERLAY':0,'VOVERLAY':0,'CRS':'EPSG:2154','OUTPUT':'memory:'})
+                                 'OUTPUT':'memory:'},
+                                 feedback=feedback)
+                                 
+        feedback.pushDebugInfo(self.tr("Chargement de la grille..."))
+        feedback.pushInfo('')
         
-        '''
-            source = self.parameterAsSource(parameters, self.INPUT, context)
-            (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT,
-                    context, source.fields(), source.wkbType(), source.sourceCrs())
+        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
+                                               result2['OUTPUT'].fields(), QgsWkbTypes.Polygon, result2['OUTPUT'].crs())  
 
-            # Compute the number of steps to display within the progress bar and
-            # get features from source
-            total = 100.0 / source.featureCount() if source.featureCount() else 0
-            features = source.getFeatures()
-
-            for current, feature in enumerate(features):
-                # Stop the algorithm if cancel button has been clicked
-                if feedback.isCanceled():
-                    break
-
-                # Add a feature in the sink
-                sink.addFeature(feature, QgsFeatureSink.FastInsert)
-
-                # Update the progress bar
-                feedback.setProgress(int(current * total))
-
-            # Return the results of the algorithm. In this case our only result is
-            # the feature sink which contains the processed features, but some
-            # algorithms may return multiple feature sinks, calculated numeric
-            # statistics, etc. These should all be included in the returned
-            # dictionary, with keys matching the feature corresponding parameter
-            # or output names.
-            return {self.OUTPUT: dest_id}
-        '''
-
+        features = result2['OUTPUT'].getFeatures()
+        for feature in features:
+            sink.addFeature(feature, QgsFeatureSink.FastInsert)
+            
+        return {self.OUTPUT: 'dest_id'}
+    
     def name(self):
         """
         Returns the algorithm name, used for identifying the algorithm. This
@@ -885,7 +815,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         lowercase alphanumeric characters only and no spaces or other
         formatting characters.
         """
-        return 'createinspiregrid'
+        return 'inspiregrid'
 
     def displayName(self):
         """
