@@ -25,7 +25,7 @@
         </layer>
         <layer enabled="1" locked="0" class="GeometryGenerator" pass="0">
           <prop k="SymbolType" v="Line"/>
-          <prop k="geometryModifier" v=" make_line(point_n($geometry,3), make_point(x(point_n($geometry,3))+maximum(WIDTH)/1.8,y(point_n($geometry,3))))"/>
+          <prop k="geometryModifier" v=" make_line(point_n($geometry,3), make_point(x(point_n($geometry,3))+maximum(D)/1.8,y(point_n($geometry,3))))"/>
           <data_defined_properties>
             <Option type="Map">
               <Option value="" name="name" type="QString"/>
@@ -83,7 +83,7 @@
           <Option name="properties" type="Map">
             <Option name="PositionX" type="Map">
               <Option value="true" name="active" type="bool"/>
-              <Option value="x( $geometry ) +  maximum(WIDTH)/1.8" name="expression" type="QString"/>
+              <Option value="x( $geometry ) +  maximum(D)/1.8" name="expression" type="QString"/>
               <Option value="3" name="type" type="int"/>
             </Option>
             <Option name="PositionY" type="Map">
