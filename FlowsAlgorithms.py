@@ -686,7 +686,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
             buffer = processing.run("native:buffer", 
                             {'INPUT':geometryLayer,
                              'DISTANCE':QgsProperty.fromExpression(
-                                        '-sqrt(area($geometry)/(20*pi()))'),
+                                        '-sqrt(area($geometry)/(10*pi()))'),
                              'SEGMENTS':5,
                              'END_CAP_STYLE':0,
                              'JOIN_STYLE':0,
@@ -817,10 +817,23 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
                     'INPUT_GEOMETRY_CRS':geometryLayer.crs(),
                     'OUTPUT':'memory:'})
                     
+            singleParts = processing.run("native:multiparttosingleparts", 
+                    {'INPUT':lineDestination['OUTPUT'],
+                     'OUTPUT':'memory:'})
+                    
+            arrow = processing.run("qgis:executesql", 
+                    {'INPUT_DATASOURCES':[geometryLayer,singleParts['OUTPUT']],
+                     'INPUT_QUERY':'select input2.* from input2 where st_intersects(input2.geometry,(select input1.geometry from input1 where input2.origine = input1.{0})) and st_intersects(input2.geometry,(select input1.geometry from input1 where input2.dest = input1.{0}))'.format(geographicIdName),
+                     'INPUT_UID_FIELD':'',
+                     'INPUT_GEOMETRY_FIELD':'geometry',
+                     'INPUT_GEOMETRY_TYPE':0,
+                     'INPUT_GEOMETRY_CRS':None,
+                     'OUTPUT':'memory:'})
+                     
             (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
-                                               lineDestination['OUTPUT'].fields(), QgsWkbTypes.LineString, lineDestination['OUTPUT'].crs())
+                                               arrow['OUTPUT'].fields(), QgsWkbTypes.LineString, arrow['OUTPUT'].crs())
 
-            features = lineDestination['OUTPUT'].getFeatures()
+            features = arrow['OUTPUT'].getFeatures()
 
         else:
 
@@ -859,18 +872,17 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         # PropertyArrowStartWidth -> 45
         layerProperties.property(45).setExpressionString(expressionString)
         
-        expressionString = '"WIDTH"*0.8'.format(self.maxValue, self.maxWidth)
+        # expressionString = '"WIDTH"*0.8'.format(self.maxValue, self.maxWidth)
         # expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)*0.8'.format(self.maxValue, self.maxWidth)
         
         # PropertyArrowHeadLength -> 46
-        layerProperties.property(46).setExpressionString(expressionString)
+        layerProperties.property(46).setExpressionString('if($length/2 < "WIDTH"+.1*maximum("WIDTH"), $length/2, "WIDTH"+.1*maximum("WIDTH"))')
         # PropertyArrowHeadThickness -> 47
-        layerProperties.property(47).setExpressionString(expressionString)
+        layerProperties.property(47).setExpressionString('0.5*"WIDTH"+.1*maximum("WIDTH")')
         
         expressionString = '"WIDTH"'.format(self.maxValue, self.maxWidth)
         # PropertyOffset -> 7
-        layerProperties.property(7).setExpressionString(expressionString)        
-        
+        layerProperties.property(7).setExpressionString('0.5*"WIDTH"+.2*maximum("WIDTH")')
         
         output.triggerRepaint()
         
@@ -1290,18 +1302,17 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
         # PropertyArrowStartWidth -> 45
         layerProperties.property(45).setExpressionString(expressionString)
         
-        expressionString = '"WIDTH"*0.8'.format(self.maxValue, self.maxWidth)
+        # expressionString = '"WIDTH"*0.8'.format(self.maxValue, self.maxWidth)
         # expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)*0.8'.format(self.maxValue, self.maxWidth)
         
         # PropertyArrowHeadLength -> 46
-        layerProperties.property(46).setExpressionString(expressionString)
+        layerProperties.property(46).setExpressionString('if($length/2 < "WIDTH"+.1*maximum("WIDTH"), $length/2, "WIDTH"+.1*maximum("WIDTH"))')
         # PropertyArrowHeadThickness -> 47
-        layerProperties.property(47).setExpressionString(expressionString)
+        layerProperties.property(47).setExpressionString('0.5*"WIDTH"+.1*maximum("WIDTH")')
         
         expressionString = '"WIDTH"'.format(self.maxValue, self.maxWidth)
         # PropertyOffset -> 7
-        layerProperties.property(7).setExpressionString(expressionString)      
-        
+        layerProperties.property(7).setExpressionString('0.5*"WIDTH"+.2*maximum("WIDTH")')
         
         output.triggerRepaint()
         
