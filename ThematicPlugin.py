@@ -34,12 +34,8 @@ import os
 import sys
 import inspect
 
-from qgis.core import QgsProcessingAlgorithm, QgsApplication, QgsSettings
+from qgis.core import QgsProcessingAlgorithm, QgsApplication
 from .ThematicProvider import ThematicProvider
-from qgis.PyQt.QtCore import QTranslator, QCoreApplication
-from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QMenu, QAction
-from os.path import dirname, join, exists, isfile
 
 cmd_folder = os.path.split(inspect.getfile(inspect.currentframe()))[0]
 
@@ -53,25 +49,6 @@ class ThematicPlugin(object):
         # self.provider = ThematicProvider()        
         # remplacé par
         self.provider =  None
-        
-        # initialize plugin directory
-        self.plugin_dir = dirname(__file__)
-        try:
-            locale = QgsSettings().value('locale/userLocale', 'en')[0:2]
-        except AttributeError:
-            # Fallback to english #132
-            LOGGER.warning('Fallback to English as default language for the plugin')
-            locale = 'en'
-        locale_path = join(
-            self.plugin_dir,
-            'i18n',
-            'Thematic_{0}.qm'.format(locale))
-
-        if exists(locale_path):
-            LOGGER.info('Translation to {}'.format(locale))
-            self.translator = QTranslator()
-            self.translator.load(locale_path)
-            QCoreApplication.installTranslator(self.translator)
         
     def initProcessing(self):
         """Init Processing provider for QGIS >= 3.8."""

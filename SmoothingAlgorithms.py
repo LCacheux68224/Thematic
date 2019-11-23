@@ -88,7 +88,7 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
     # used when calling the algorithm from another algorithm, or when
     # calling from the QGIS console.
 
-    OUTPUT_LAYER = 'OUTPUT_LAYER'
+    OUTPUT = 'OUTPUT'
     INPUT = 'INPUT'
     CELL_SIZE = 'CELL_SIZE'
 
@@ -123,9 +123,10 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
         # algorithm is run in QGIS).
 
         self.addParameter(
-            QgsProcessingParameterVectorDestination(
-                self.OUTPUT_LAYER,
-                self.tr("Grille BTB")
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT,
+                self.tr("Grille BTB"), 
+                type=QgsProcessing.TypeVectorPolygon
             )
         )
             
@@ -142,7 +143,7 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
         source2 = source.materialize(QgsFeatureRequest())
         crs = source2.crs().authid()
         
-        OUTPUT_LAYER = self.parameterAsOutputLayer(parameters,self.OUTPUT_LAYER,context)
+        # OUTPUT_LAYER = self.parameterAsOutputLayer(parameters,self.OUTPUT_LAYER,context)
         
         CELL_SIZE = self.parameterAsInt( parameters, self.CELL_SIZE, context )
         # Layer extent
@@ -204,10 +205,21 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
                                  'name': 'y', 
                                  'precision': 0, 
                                  'type': 2}],
-                         'OUTPUT':OUTPUT_LAYER},
+                         'OUTPUT':'memory:'},
                          feedback=None)
+                         
+        feedback.pushDebugInfo(self.tr("Chargement de la grille..."))
+        feedback.pushInfo('')
         
-        return {self.OUTPUT_LAYER: 'OUTPUT_LAYER'}
+        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
+                                               result2['OUTPUT'].fields(), QgsWkbTypes.Polygon, result2['OUTPUT'].crs())  
+
+        features = result2['OUTPUT'].getFeatures()
+        for feature in features:
+            sink.addFeature(feature, QgsFeatureSink.FastInsert)
+                         
+        
+        return {self.OUTPUT: 'dest_id'}
     
     def name(self):
         """
@@ -348,7 +360,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFile(
                 self.GRID,
-                self.tr('Grille prédéfinie'),
+                self.tr('Grille Shapefile prédéfinie'),
                 optional = True
             )
         )        
@@ -383,7 +395,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         
         if platform == 'win32':
             execDir = 'x64'
-            command = ['C:/Program Files/R/R-3.2.1/bin/Rscript.exe','-e' ,'getRversion()']
+            command = ['C:/Program Files/R/R-3.3.3/bin/Rscript.exe','-e' ,'getRversion()']
         else:
             command = ['R --version']
  
@@ -396,8 +408,6 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
             universal_newlines=True,
         )
         stdout, stderr  = proc.communicate()
-        feedback.pushInfo("      • stdout :    {0}".format(stdout))
-        feedback.pushInfo("      • stderr :    {0}".format(stderr))
         # Retrieve the feature source and sink. The 'dest_id' variable is used
         # to uniquely identify the feature sink, and must be included in the
         # dictionary returned by the processAlgorithm function.
@@ -405,46 +415,22 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         grid = self.parameterAsString(parameters, self.GRID, context)
         x =  self.parameterAsString(parameters, self.X_COORDINATE, context)
         y =  self.parameterAsString(parameters, self.Y_COORDINATE, context)
-        feedback.pushInfo("      • x :    {0}".format(x))        
         quantileList = self.parameterAsString(parameters, self.QUANTILE_LIST, context)
-        feedback.pushInfo("      • Grille :    {0}".format(grid))
+
         dirpath = tempfile.mkdtemp()
         sortie = str(re.sub('\\\\','/',dirpath) + "/output.csv")
-        feedback.pushInfo("      • sortie csv temporaire :    {0}".format(sortie))
+        
         # sortieLissage = str(re.sub('\\\\','/',dirpath) + "/lissage.csv")
      
 
         varList = self.parameterAsFields(parameters,self.VAR_LIST,context)
         varIndex = [source.fields().indexOf(item) for item in varList]
         fieldList = [source.fields().toList()[item] for item in varIndex]
-        feedback.pushInfo("      • test :    {0}".format(fieldList))
         
         fieldList.append((QgsField("x", QVariant.Double)))
         fieldList.append((QgsField("y", QVariant.Double)))
-        feedback.pushInfo("      • test :    {0}".format(fieldList))
-        """
-            crsString = source.crs().authid() 
-            feedback.pushInfo("      • crs :    {0}".format(crsString))
-            vl = QgsVectorLayer("Point", "temp", 'memory')
-            pr = vl.dataProvider()
-            pr.addAttributes(fieldList)
-            vl.updateFields() 
-            feedback.pushInfo("      • test2 :    {0}".format(vl.fields().toList()))
-            features = source.getFeatures()
-            for elem in features:
-                try:
-                    f =QgsFeature()
-                    f.setGeometry(None)
-                    attributes = []
-                    centroid = elem.geometry().centroid().asPoint()
-                    attributes = [float(elem.attributes()[val]) or 0 for val in varIndex]
-                    attributes.append(elem.geometry().centroid().asPoint()[0])
-                    attributes.append(elem.geometry().centroid().asPoint()[1])
-                    f.setAttributes(attributes)
-                    pr.addFeature(f)
-                except:
-                    pass
-        """
+
+
             
         # QgsVectorFileWriter.writeAsVectorFormat(vl, sortie, "utf8", source.crs(), "CSV")
 
@@ -468,17 +454,11 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         # emplacement du script R
         
         RlibFolder = re.sub('\\\\','/',os.path.dirname(__file__)) + "/rlib"
-
-        feedback.pushInfo("      • RlibFolder :    {0}".format(RlibFolder))
-        # args = [sortie, str(cellsize),str(bandwidth), quantileList, re.sub('\.shp','.dbf',gridLayerPath), smoothedDatasPath, RlibFolder]
         
         if quantileList =='' :
             quantileList = 'NULL'
-        
-        # Quantiles désactivés pour le moment
-        # quantileList == 'NULL'
 
-        command = ['C:/Program Files/R/R-3.2.1/bin/x64/Rscript.exe','-e' ,'getRversion()']
+        command = ['C:/Program Files/R/R-3.3.3/bin/x64/Rscript.exe','-e' ,'getRversion()']
 
         proc = subprocess.Popen(
             command,
@@ -490,51 +470,134 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         )
         stdout, stderr  = proc.communicate()  
         versionR = re.findall("'(\d.+)'",stdout)[0]
-        feedback.pushInfo("      • versionR :    {0}".format(versionR))
         
+        feedback.pushInfo(" ")
+        feedback.pushInfo("Lissage BTB (Package R - Beyond The Border) ")
         
-        
+        feedback.pushInfo("      • version de R :    {0}".format(versionR))
+        feedback.pushInfo(" ")
+        if grid != '':
+            feedback.pushInfo("      • Grille prédéfinie:    {0}".format(grid))
+        else:
+            feedback.pushInfo("      • Pas de grille prédéfinie")
         cellsize = self.parameterAsInt(parameters,self.CELL_SIZE,context)
         bandwidth = self.parameterAsInt(parameters,self.BANDWIDTH,context)
-        feedback.pushInfo("      • liste des variables :    {0}".format(varList))
-        feedback.pushInfo("      • liste des index :    {0}".format(varIndex))         
-        
+        feedback.pushInfo("      • liste des variables à lisser:    {0}".format(varList))
+        feedback.pushInfo("      • Maille :    {0} m".format(cellsize))
+        feedback.pushInfo("      • Rayon de lissage :    {0} m".format(bandwidth))
+        if quantileList != 'NULL':
+            feedback.pushInfo("      • Liste des quantiles :    {0}".format(quantileList))
+        else:
+            feedback.pushInfo("      • Pas de quantiles demandés")
+        feedback.pushInfo(" ")
         if grid != '':
             scriptR = re.sub('\\\\','/',os.path.dirname(__file__)) + '/rscript/lissageGrille.R'
-            feedback.pushInfo("      • scriptR :    {0}".format(scriptR))
             sortieLissage = str(re.sub('\\\\','/',dirpath) + "/lissage.csv")
             args = [sortie, str(cellsize), str(bandwidth), quantileList, re.sub('\.shp','.dbf',grid),sortieLissage, RlibFolder]
-            command = ['C:/Program Files/R/R-3.2.1/bin/x64/Rscript.exe','--vanilla',scriptR]+args
-            feedback.pushInfo("      • command :    {0}".format(command))
+            command = ['C:/Program Files/R/R-3.3.3/bin/x64/Rscript.exe','--vanilla',scriptR]+args
+            feedback.pushInfo("      • commande :\n{0}".format(command))
             
             proc = subprocess.run(
                 command,
                 shell=True, check=False
             )
-            # feedback.pushInfo("      • proc :    {0}".format(proc.stdout))  
+            
+            filepath = sortieLissage
+            with open(filepath) as fp:
+                line = fp.readline()
+            fp.close()
+            
+            varList2 = line.replace('"',"").split(',')[3:-1] 
             
             result = processing.run("native:joinattributestable", 
-                    {'INPUT':grid,'FIELD':'ID','INPUT_2':sortieLissage,'FIELD_2':'ID','FIELDS_TO_COPY':[],'METHOD':1,'DISCARD_NONMATCHING':False,'PREFIX':'','OUTPUT':'memory:'})
-
-        
+                    {'INPUT':grid,
+                     'FIELD':'ID',
+                     'INPUT_2':sortieLissage,
+                     'FIELD_2':'ID',
+                     'FIELDS_TO_COPY':varList2,
+                     'METHOD':1,'DISCARD_NONMATCHING':False,
+                     'PREFIX':'',
+                     'OUTPUT':'memory:'})
+            
         else:
             scriptR = re.sub('\\\\','/',os.path.dirname(__file__)) + '/rscript/schematisation.R'
-            feedback.pushInfo("      • scriptR :    {0}".format(scriptR))
             crsString = QgsProject.instance().crs().authid()
             crsCode = str(crsString.split(':')[1])
-            sortieLissage = str(re.sub('\\\\','/',dirpath) + "/lissage.gpkg")
+            sortieLissage = str(re.sub('\\\\','/',dirpath) + "/lissage.csv")
             args = [sortie, str(cellsize), str(bandwidth), quantileList, crsCode,sortieLissage, RlibFolder]
-            command = ['C:/Program Files/R/R-3.2.1/bin/x64/Rscript.exe','--vanilla',scriptR]+args
-            feedback.pushInfo("      • command :    {0}".format(command))
+            command = ['C:/Program Files/R/R-3.3.3/bin/x64/Rscript.exe','--vanilla',scriptR]+args
+            feedback.pushInfo("      • commande :\n{0}".format(command))
             proc = subprocess.run(
                 command,
                 shell=True, check=False
             )
             
-            result = processing.run("native:fixgeometries", 
-                    {'INPUT':sortieLissage,
-                    'OUTPUT':'memory:'})
-                    
+            summaryX = processing.run("qgis:basicstatisticsforfields", 
+                            {'INPUT_LAYER':sortieLissage,
+                                'FIELD_NAME':'x'
+                            },
+                            feedback = None)
+            summaryY = processing.run("qgis:basicstatisticsforfields", 
+                            {'INPUT_LAYER':sortieLissage,
+                                'FIELD_NAME':'y'
+                            },
+                            feedback = None)
+                            
+            layerExtent = "{0},{1},{2},{3}".format(float(summaryX['MIN'])+cellsize/2,
+                                                   float(summaryX['MAX'])-cellsize/2,
+                                                   float(summaryY['MIN'])+cellsize/2,
+                                                   float(summaryY['MAX'])-cellsize/2)
+            
+            grille = processing.run("qgis:creategrid", 
+                            {'TYPE':2,
+                             'EXTENT':layerExtent,
+                             'HSPACING':cellsize,
+                             'VSPACING':cellsize,
+                             'HOVERLAY':0,
+                             'VOVERLAY':0,
+                             'CRS':crsString,
+                             'OUTPUT':'memory:'},
+                             feedback=None)
+            
+            # Ajout des colonnes ID, x et y
+            result2 = processing.run("qgis:refactorfields", 
+                            {'INPUT':grille['OUTPUT'],
+                                 'FIELDS_MAPPING':[{'expression': 'to_string("left" +500)+\'_\'+to_string("bottom"+500)', 
+                                     'length': 25, 
+                                     'name': 'ID', 
+                                     'precision': 0, 
+                                     'type': 10}, 
+                                 {'expression': 'left+500',
+                                     'length': 24, 
+                                     'name': 'x', 
+                                     'precision': 0, 
+                                     'type': 2}, 
+                                 {'expression': 'bottom+500', 
+                                     'length': 24, 
+                                     'name': 'y', 
+                                     'precision': 0, 
+                                     'type': 2}],
+                             'OUTPUT':'memory:'},
+                             feedback=None)
+                
+            
+            filepath = sortieLissage
+            with open(filepath) as fp:
+                line = fp.readline()
+            fp.close()
+            
+            varList2 = line.replace('"',"").split(',')[3:-1] 
+            
+            result = processing.run("native:joinattributestable", 
+                    {'INPUT':result2['OUTPUT'],
+                     'FIELD':'ID',
+                     'INPUT_2':sortieLissage,
+                     'FIELD_2':'ID',
+                     'FIELDS_TO_COPY':varList2,
+                     'METHOD':1,'DISCARD_NONMATCHING':True,
+                     'PREFIX':'',
+                     'OUTPUT':'memory:'})
+
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT,
                     context, result['OUTPUT'].fields(), QgsWkbTypes.Polygon, result['OUTPUT'].sourceCrs())
         features = result['OUTPUT'].getFeatures()
@@ -544,31 +607,6 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         shutil.rmtree(dirpath)
         
         return {self.OUTPUT: dest_id}
-        # Compute the number of steps to display within the progress bar and
-        # get features from source
-        """
-        total = 100.0 / source.featureCount() if source.featureCount() else 0
-        features = source.getFeatures()
-
-        for current, feature in enumerate(features):
-            # Stop the algorithm if cancel button has been clicked
-            if feedback.isCanceled():
-                break
-
-            # Add a feature in the sink
-            sink.addFeature(feature, QgsFeatureSink.FastInsert)
-
-            # Update the progress bar
-            feedback.setProgress(int(current * total))
-
-        # Return the results of the algorithm. In this case our only result is
-        # the feature sink which contains the processed features, but some
-        # algorithms may return multiple feature sinks, calculated numeric
-        # statistics, etc. These should all be included in the returned
-        # dictionary, with keys matching the feature corresponding parameter
-        # or output names.
-        return {self.OUTPUT: dest_id}
-        """
 
     def name(self):
         """
