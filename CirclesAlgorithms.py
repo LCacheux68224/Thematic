@@ -868,7 +868,7 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         return CreateCustomSymbolsAlgorithm()
 
     def icon(self):
-        return QIcon(os.path.dirname(__file__) + '/images/iconRonds.png')
+        return QIcon(os.path.dirname(__file__) + '/images/iconRonds2.png')
         
     def shortHelpString(self):
         """
@@ -1183,7 +1183,7 @@ class CreateCirclesLegendAlgorithm(QgsProcessingAlgorithm):
         return CreateCirclesLegendAlgorithm()
 
     def icon(self):
-        return QIcon(os.path.dirname(__file__) + '/images/iconRondsLegende.png')
+        return QIcon(os.path.dirname(__file__) + '/images/iconRondsLegende2.png')
 
 class FormatProportionalSymbolsLegendAlgorithm(QgsProcessingAlgorithm):
     """
@@ -1298,7 +1298,7 @@ class FormatProportionalSymbolsLegendAlgorithm(QgsProcessingAlgorithm):
         return FormatProportionalSymbolsLegendAlgorithm()
 
     def icon(self):
-        return QIcon(os.path.dirname(__file__) + '/images/iconRonds.png')
+        return QIcon(os.path.dirname(__file__) + '/images/iconRondsLegende2.png')
         
     def shortHelpString(self):
         """

@@ -58,12 +58,14 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingUtils,
                        QgsArrowSymbolLayer,
                        QgsSymbol,
+                       QgsPoint,
                        QgsProcessingParameterBoolean,
                        QgsExpressionContextUtils,
+                       QgsProcessingParameterString,
                        QgsProperty,
                        QgsWkbTypes)
 import processing
-
+from qgis.utils import iface
 
 class CreateLinesAlgorithm(QgsProcessingAlgorithm):
     """
@@ -294,8 +296,7 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
             sink.addFeature(feature, QgsFeatureSink.FastInsert)   
             
         self.dest_id = dest_id
-
-
+        
         # Return the results of the algorithm. In this case our only result is
         # the feature sink which contains the processed features, but some
         # algorithms may return multiple feature sinks, calculated numeric
@@ -541,6 +542,8 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
     MAX_DIST = 'MAX_DIST'
     CODGEO = 'CODGEO'
     SMART_ARROWS="SMART_ARROWS"
+    ADD_LEGEND='ADD_LEGEND'
+    OUTPUT2 = 'OUTPUT2'
 
     def initAlgorithm(self, config):
         """
@@ -617,7 +620,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         
         self.addParameter(
             QgsProcessingParameterBoolean(self.SMART_ARROWS,
-                self.tr('Flèches selon polygones'),
+                self.tr('Flèches réduites => nécessite un fond de géolocalisation de type polygone'),
                 defaultValue=False))
                 
         params = []
@@ -640,7 +643,12 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
                 optional=False
             )
         )  
-
+        
+        self.addParameter(
+            QgsProcessingParameterBoolean(self.ADD_LEGEND,
+                self.tr('Ajouter une légende'),
+                defaultValue=True))
+                
         for param in params:
             param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
             self.addParameter(param)
@@ -652,7 +660,15 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
                 type=QgsProcessing.TypeVectorPolygon
             )
         ) 
-            
+        
+        self.addParameter(
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT2, 
+                self.tr('Légende'), 
+                type=QgsProcessing.TypeVectorPolygon
+            )
+        )
+        
     def processAlgorithm(self, parameters, context, feedback):
         """
         Here is where the processing itself takes place.
@@ -677,6 +693,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         layerExtent = geometryLayer.extent()
         maximumExtent = max((layerExtent.xMaximum()-layerExtent.xMinimum()),(layerExtent.yMaximum()-layerExtent.yMinimum()))
 
+        addLegend = self.parameterAsBool(parameters,self.ADD_LEGEND,context)
         
         # feedback.pushInfo("      • maximumExtent :    {0}".format(maximumExtent))        
 
@@ -686,7 +703,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
             buffer = processing.run("native:buffer", 
                             {'INPUT':geometryLayer,
                              'DISTANCE':QgsProperty.fromExpression(
-                                        '-sqrt(area($geometry)/(20*pi()))'),
+                                        '-sqrt(area($geometry)/(10*pi()))'),
                              'SEGMENTS':5,
                              'END_CAP_STYLE':0,
                              'JOIN_STYLE':0,
@@ -757,7 +774,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         maxValue = max([abs(item.attributes()[valueFieldIndex]) for item in inputTable.getFeatures()]) 
 
         self.maxValue = maxValue
-        self.maxWidth = (maximumExtent**(.5))*30
+        self.maxWidth = (maximumExtent**(.5))*4
             
         project = QgsProject.instance()            
         QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxValue',self.maxValue)
@@ -817,10 +834,23 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
                     'INPUT_GEOMETRY_CRS':geometryLayer.crs(),
                     'OUTPUT':'memory:'})
                     
+            singleParts = processing.run("native:multiparttosingleparts", 
+                    {'INPUT':lineDestination['OUTPUT'],
+                     'OUTPUT':'memory:'})
+                    
+            arrow = processing.run("qgis:executesql", 
+                    {'INPUT_DATASOURCES':[geometryLayer,singleParts['OUTPUT']],
+                     'INPUT_QUERY':'select input2.* from input2 where st_intersects(input2.geometry,(select input1.geometry from input1 where input2.origine = input1.{0})) and st_intersects(input2.geometry,(select input1.geometry from input1 where input2.dest = input1.{0}))'.format(geographicIdName),
+                     'INPUT_UID_FIELD':'',
+                     'INPUT_GEOMETRY_FIELD':'geometry',
+                     'INPUT_GEOMETRY_TYPE':0,
+                     'INPUT_GEOMETRY_CRS':None,
+                     'OUTPUT':'memory:'})
+                     
             (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
-                                               lineDestination['OUTPUT'].fields(), QgsWkbTypes.LineString, lineDestination['OUTPUT'].crs())
+                                               arrow['OUTPUT'].fields(), QgsWkbTypes.LineString, arrow['OUTPUT'].crs())
 
-            features = lineDestination['OUTPUT'].getFeatures()
+            features = arrow['OUTPUT'].getFeatures()
 
         else:
 
@@ -834,7 +864,38 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         
         self.dest_id  = dest_id
 
+        if addLegend:  
+        
+            xLegend = vl.sourceExtent().xMaximum()
+            yLegend = (vl.sourceExtent().yMinimum()+vl.sourceExtent().yMaximum())/2
+            legendCoords = str(xLegend)+','+str(yLegend)
+            result2 = processing.run("thematic:arrowslegend", 
+                        {'MAX_VALUE':maxValue,
+                        'MAX_WIDTH':self.maxWidth,
+                        'VALUES_LIST':'',
+                        'XY_LEGEND':legendCoords,
+                        'OUTPUT':'memory:'},
+                        feedback = feedback)
+                        
+            # processing.run("thematic:arrowslegend", {'MAX_VALUE':8800,'MAX_WIDTH':45288,'VALUES_LIST':'','OUTPUT':'memory:'})
+            feedback.pushInfo(self.tr('    Valeurs représentées dans la légende :'))
+            feedback.pushInfo("     • val1 : {0}".format(maxValue))
+            feedback.pushInfo("     • val2 : {0}".format(maxValue/2))
+            feedback.pushInfo(self.tr('    Coordonnées de la légende :'))             
+            feedback.pushInfo("      • X :    {0}".format(xLegend))
+            feedback.pushInfo("      • Y :    {0}".format(yLegend))              
+            feedback.pushInfo('____________________')
+            feedback.pushInfo('')             
+            (sink2, dest_id2) = self.parameterAsSink(parameters, self.OUTPUT2, context,
+                                               result2['OUTPUT'].fields(), QgsWkbTypes.Polygon, result2['OUTPUT'].crs())        
+            features = result2['OUTPUT'].getFeatures()
+            for feature in features:
+                sink2.addFeature(feature, QgsFeatureSink.FastInsert)
+                
+            # to get hold of the layer in post processing for styling the legend
+            self.dest_id2=dest_id2
 
+            return {self.OUTPUT_LAYER: 'dest_id', self.OUTPUT2: 'dest_id2'} 
 
 
         # Return the results of the algorithm. In this case our only result is
@@ -843,7 +904,14 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         # statistics, etc. These should all be included in the returned
         # dictionary, with keys matching the feature corresponding parameter
         # or output names.
-        return {self.OUTPUT_LAYER: dest_id}
+        else:
+            feedback.pushInfo(self.tr('   Légende non demandée'))   
+            feedback.pushInfo('____________________')
+            feedback.pushInfo('')
+            
+            self.dest_id2 =  None
+        
+            return {self.OUTPUT_LAYER: dest_id}
 
     def postProcessAlgorithm(self, context, feedback):
         # Styling the arrows
@@ -859,18 +927,17 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         # PropertyArrowStartWidth -> 45
         layerProperties.property(45).setExpressionString(expressionString)
         
-        expressionString = '"WIDTH"*0.8'.format(self.maxValue, self.maxWidth)
+        # expressionString = '"WIDTH"*0.8'.format(self.maxValue, self.maxWidth)
         # expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)*0.8'.format(self.maxValue, self.maxWidth)
         
         # PropertyArrowHeadLength -> 46
-        layerProperties.property(46).setExpressionString(expressionString)
+        layerProperties.property(46).setExpressionString('if($length/2 < maximum("WIDTH"), $length/2, maximum("WIDTH"))')
         # PropertyArrowHeadThickness -> 47
-        layerProperties.property(47).setExpressionString(expressionString)
+        layerProperties.property(47).setExpressionString('0.5*"WIDTH"+.1*maximum("WIDTH")')
         
         expressionString = '"WIDTH"'.format(self.maxValue, self.maxWidth)
         # PropertyOffset -> 7
-        layerProperties.property(7).setExpressionString(expressionString)        
-        
+        layerProperties.property(7).setExpressionString('0.5*"WIDTH"+.1*maximum("WIDTH")')
         
         output.triggerRepaint()
         
@@ -917,7 +984,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         return CreateArrowsAlgorithm()
 
     def icon(self):
-        return QIcon(os.path.dirname(__file__) + '/images/iconFlechesJoignantes.png')
+        return QIcon(os.path.dirname(__file__) + '/images/fleches.png')
         
         
 class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
@@ -950,6 +1017,8 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
     MAX_WIDTH_SCALE = 'MAX_WIDTH_SCALE'
     CODGEO = 'CODGEO'
     SMART_ARROWS="SMART_ARROWS"
+    ADD_LEGEND = 'ADD_LEGEND'
+    OUTPUT2 = 'OUTPUT2'
 
     def initAlgorithm(self, config):
         """
@@ -1046,7 +1115,7 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
         
         self.addParameter(
             QgsProcessingParameterBoolean(self.SMART_ARROWS,
-                self.tr('Flèches selon polygones'),
+                self.tr('Flèches réduites => nécessite un fond de géolocalisation de type polygone'),
                 defaultValue=False))
                 
         params = []
@@ -1069,7 +1138,12 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
                 optional=False
             )
         )  
-
+        
+        self.addParameter(
+            QgsProcessingParameterBoolean(self.ADD_LEGEND,
+                self.tr('Ajouter une légende'),
+                defaultValue=True))
+                
         for param in params:
             param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
             self.addParameter(param)
@@ -1081,7 +1155,15 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
                 type=QgsProcessing.TypeVectorPolygon
             )
         ) 
-            
+        
+        self.addParameter(
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT2, 
+                self.tr('Légende'), 
+                type=QgsProcessing.TypeVectorPolygon
+            )
+        )
+        
     def processAlgorithm(self, parameters, context, feedback):
         """
         Here is where the processing itself takes place.
@@ -1117,7 +1199,7 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
             buffer = processing.run("native:buffer", 
                             {'INPUT':geometryLayer,
                              'DISTANCE':QgsProperty.fromExpression(
-                                        '-sqrt(area($geometry)/(20*pi()))'),
+                                        '-sqrt(area($geometry)/(10*pi()))'),
                              'SEGMENTS':5,
                              'END_CAP_STYLE':0,
                              'JOIN_STYLE':0,
@@ -1237,7 +1319,8 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
                     'INPUT_GEOMETRY_FIELD':'',
                     'INPUT_GEOMETRY_TYPE':4,
                     'INPUT_GEOMETRY_CRS':geometryLayer.crs(),
-                    'OUTPUT':'memory:'})
+                    'OUTPUT':'memory:'},
+                              feedback = feedback)
                     
             lineDestination = processing.run("qgis:executesql",
                     {'INPUT_DATASOURCES':[lineOrigin['OUTPUT'],sql['OUTPUT']],
@@ -1290,18 +1373,17 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
         # PropertyArrowStartWidth -> 45
         layerProperties.property(45).setExpressionString(expressionString)
         
-        expressionString = '"WIDTH"*0.8'.format(self.maxValue, self.maxWidth)
+        # expressionString = '"WIDTH"*0.8'.format(self.maxValue, self.maxWidth)
         # expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)*0.8'.format(self.maxValue, self.maxWidth)
         
         # PropertyArrowHeadLength -> 46
-        layerProperties.property(46).setExpressionString(expressionString)
+        layerProperties.property(46).setExpressionString('if($length/2 < maximum("WIDTH"), $length/2, maximum("WIDTH"))')
         # PropertyArrowHeadThickness -> 47
-        layerProperties.property(47).setExpressionString(expressionString)
+        layerProperties.property(47).setExpressionString('0.5*"WIDTH"+.1*maximum("WIDTH")')
         
-        expressionString = '"WIDTH"'.format(self.maxValue, self.maxWidth)
+        # expressionString = '"WIDTH"'.format(self.maxValue, self.maxWidth)
         # PropertyOffset -> 7
-        layerProperties.property(7).setExpressionString(expressionString)      
-        
+        layerProperties.property(7).setExpressionString('0.5*"WIDTH"+.1*maximum("WIDTH")')
         
         output.triggerRepaint()
         
@@ -1348,7 +1430,7 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
         return CreateCustomArrowsAlgorithm()
 
     def icon(self):
-        return QIcon(os.path.dirname(__file__) + '/images/iconFlechesJoignantes.png')
+        return QIcon(os.path.dirname(__file__) + '/images/fleches2.png')
         
 class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
     """
@@ -1378,6 +1460,8 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
     MIN_FLOW = 'MIN_FLOW'
     MAX_DIST = 'MAX_DIST'
     CODGEO = 'CODGEO'
+    ADD_LEGEND = 'ADD_LEGEND'
+    OUTPUT2 = 'OUTPUT2'
 
     
 
@@ -1474,6 +1558,11 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
             )
         )    
         
+        self.addParameter(
+            QgsProcessingParameterBoolean(self.ADD_LEGEND,
+                self.tr('Ajouter une légende'),
+                defaultValue=True))
+                
         for param in params:
             param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
             self.addParameter(param)
@@ -1485,7 +1574,13 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
                 type=QgsProcessing.TypeVectorPolygon
             )
         ) 
-            
+        self.addParameter(
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT2, 
+                self.tr('Légende'), 
+                type=QgsProcessing.TypeVectorPolygon
+            )
+        )
     def processAlgorithm(self, parameters, context, feedback):
         """
         Here is where the processing itself takes place.
@@ -1517,7 +1612,7 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         crsString = geometryLayer.crs().authid() 
         # extract coordinates of the centroid of the geometryLayer as a dictionary
         coordinatesDictionnary = {}
-
+        features = geometryLayer.getFeatures()
         for elem in features:
             centroid = elem.geometry().centroid().asPoint()
             IDvalue = elem.attributes()[codgeoIndex]
@@ -1577,9 +1672,20 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         vl.renderer().symbol().setWidth(3)  
         minDistance = min([abs(item.attributes()[3]) for item in vl.getFeatures()])*.8
         self.maxWidth = 1000*minDistance/3
-
         self.maxValue = maxValue
-
+        
+        varTexte = u' abs(\"FLUX\") * {0}/{1}'.format(self.maxWidth,self.maxValue)
+        widthAttribute = processing.run("qgis:fieldcalculator", 
+                                {'INPUT':vl,
+                                 'FIELD_NAME':'WIDTH',
+                                 'FIELD_TYPE':0,
+                                 'FIELD_LENGTH':10,
+                                 'FIELD_PRECISION':3,
+                                 'NEW_FIELD':True,
+                                 'FORMULA':varTexte,
+                                 'OUTPUT':'memory:'},
+                          feedback=None)
+                          
         self.maxLength = minDistance*1000
         project = QgsProject.instance()            
         QgsExpressionContextUtils.setProjectVariable(project,'thematic_arrowsMaxValue',self.maxValue)
@@ -1589,7 +1695,7 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo("     Échelle :    ")
         feedback.pushInfo("      • valeur maximale :    {0}".format(self.maxValue))
         feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth))   
-        
+        feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth)) 
         if direction == 0:
             startDistance = 0
             endDistance = minDistance*1000
@@ -1598,14 +1704,14 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
             endDistance = QgsProperty.fromExpression('length( $geometry)')
             
         shortLines =processing.run("native:linesubstring", 
-                                {'INPUT':vl,
+                                {'INPUT':widthAttribute['OUTPUT'],
                                  'START_DISTANCE':startDistance,
                                  'END_DISTANCE':endDistance,
                                  'OUTPUT':'memory:'})                         
         
         # Add features to the sink
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
-                                               vl.fields(), QgsWkbTypes.LineString, vl.crs())
+                                               shortLines['OUTPUT'].fields(), QgsWkbTypes.LineString, shortLines['OUTPUT'].crs())
 
         features = shortLines['OUTPUT'].getFeatures()
 
@@ -1632,21 +1738,16 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         output.loadNamedStyle(path)
         
         layerProperties = output.renderer().symbol().symbolLayers()[0].dataDefinedProperties()
-        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)'.format(self.maxValue, self.maxWidth)
+        expressionString = '"WIDTH"'
         # PropertyArrowWidth -> 44
         layerProperties.property(44).setExpressionString(expressionString)
         # PropertyArrowStartWidth -> 45
         layerProperties.property(45).setExpressionString(expressionString)
         
-        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)*0.8'.format(self.maxValue, self.maxWidth)
         # PropertyArrowHeadLength -> 46
-        layerProperties.property(46).setExpressionString(expressionString)
+        layerProperties.property(46).setExpressionString('if($length/2 < maximum("WIDTH"), $length/2, maximum("WIDTH"))')
         # PropertyArrowHeadThickness -> 47
-        layerProperties.property(47).setExpressionString(expressionString)
-        
-        expressionString = '0)'
-        # PropertyOffset -> 7
-        layerProperties.property(7).setExpressionString(expressionString)        
+        layerProperties.property(47).setExpressionString('0.5*"WIDTH"+.1*maximum("WIDTH")')
         
         
         output.triggerRepaint()
@@ -1728,7 +1829,8 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
     MAX_WIDTH_SCALE = 'MAX_WIDTH_SCALE'
     MAX_LENGTH_SCALE = 'MAX_LENGTH_SCALE'
     CODGEO = 'CODGEO'
-    
+    ADD_LEGEND = 'ADD_LEGEND'
+    OUTPUT2 = 'OUTPUT2'
 
     def initAlgorithm(self, config):
         """
@@ -1859,8 +1961,12 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
                 optional=False
             )
         )    
-
         
+        self.addParameter(
+            QgsProcessingParameterBoolean(self.ADD_LEGEND,
+                self.tr('Ajouter une légende'),
+                defaultValue=True))
+                        
         for param in params:
             param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
             self.addParameter(param)
@@ -1872,7 +1978,13 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
                 type=QgsProcessing.TypeVectorPolygon
             )
         ) 
-            
+        self.addParameter(
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT2, 
+                self.tr('Légende'), 
+                type=QgsProcessing.TypeVectorPolygon
+            )
+        )
     def processAlgorithm(self, parameters, context, feedback):
         """
         Here is where the processing itself takes place.
@@ -1991,6 +2103,18 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth))
         feedback.pushInfo("      • longueur des flèches :    {0} m".format(self.maxLength))   
         
+        varTexte = u' abs(\"FLUX\") * {0}/{1}'.format(self.maxWidth,self.maxValue)
+        widthAttribute = processing.run("qgis:fieldcalculator", 
+                                {'INPUT':vl,
+                                 'FIELD_NAME':'WIDTH',
+                                 'FIELD_TYPE':0,
+                                 'FIELD_LENGTH':10,
+                                 'FIELD_PRECISION':3,
+                                 'NEW_FIELD':True,
+                                 'FORMULA':varTexte,
+                                 'OUTPUT':'memory:'},
+                          feedback=None)
+        
         if direction == 0:
             startDistance = 0
             endDistance = self.maxLength
@@ -1999,14 +2123,14 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
             endDistance = QgsProperty.fromExpression('length( $geometry)')
 
         shortLines =processing.run("native:linesubstring", 
-                                {'INPUT':vl,
+                                {'INPUT':widthAttribute['OUTPUT'],
                                  'START_DISTANCE':startDistance,
                                  'END_DISTANCE':endDistance,
                                  'OUTPUT':'memory:'})                               
         
         # Add features to the sink
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT_LAYER, context,
-                                               vl.fields(), QgsWkbTypes.LineString, vl.crs())
+                                               shortLines['OUTPUT'].fields(), QgsWkbTypes.LineString, shortLines['OUTPUT'].crs())
 
         features = shortLines['OUTPUT'].getFeatures()
 
@@ -2033,21 +2157,16 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         output.loadNamedStyle(path)
         
         layerProperties = output.renderer().symbol().symbolLayers()[0].dataDefinedProperties()
-        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)'.format(self.maxValue, self.maxWidth)
+        expressionString = '"WIDTH"'
         # PropertyArrowWidth -> 44
         layerProperties.property(44).setExpressionString(expressionString)
         # PropertyArrowStartWidth -> 45
         layerProperties.property(45).setExpressionString(expressionString)
         
-        expressionString = 'coalesce(scale_linear(abs( "FLUX" ), 0, {0}, 0,{1}), 0)*0.8'.format(self.maxValue, self.maxWidth)
         # PropertyArrowHeadLength -> 46
-        layerProperties.property(46).setExpressionString(expressionString)
+        layerProperties.property(46).setExpressionString('if($length/2 < maximum("WIDTH"), $length/2, maximum("WIDTH"))')
         # PropertyArrowHeadThickness -> 47
-        layerProperties.property(47).setExpressionString(expressionString)
-        
-        expressionString = '0)'
-        # PropertyOffset -> 7
-        layerProperties.property(7).setExpressionString(expressionString)        
+        layerProperties.property(47).setExpressionString('0.5*"WIDTH"+.1*maximum("WIDTH")')
         
         
         output.triggerRepaint()
@@ -2095,4 +2214,272 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
         return CreateCustomSaphirArrowsAlgorithm()
 
     def icon(self):
-        return QIcon(os.path.dirname(__file__) + '/images/saphir.png')
+        return QIcon(os.path.dirname(__file__) + '/images/saphir2.png')
+        
+
+class CreateArrowsLegendAlgorithm(QgsProcessingAlgorithm):
+    """
+    Gerenate a legend layer for proportional symbols
+    (circles, diamons and squares)
+    """
+    
+    # Constants used to refer to parameters and outputs. They will be
+    # used when calling the algorithm from another algorithm, or when
+    # calling from the QGIS console.
+    
+    OUTPUT = 'OUTPUT'
+    COLUMNS = 'COLUMNS'
+    MAX_WIDTH = 'MAX_WIDTH'
+    MAX_VALUE = 'MAX_VALUE'
+    VALUES_LIST = 'VALUES_LIST'
+    XY_LEGEND = 'XY_LEGEND'
+    
+    def initAlgorithm(self, config):
+        """
+        Here we define the inputs and output of the algorithm, along
+        with some other properties.
+        """
+        
+        # Use the parameters of an eventualy previous analysis
+        project = QgsProject.instance()
+        try:
+            maxValue = QgsExpressionContextUtils.projectScope(project).variable('thematic_arrowsMaxValue')
+            maxWidth = QgsExpressionContextUtils.projectScope(project).variable('thematic_arrowsMaxWidth')
+            
+        except:
+            # if not
+            maxValue = 1
+            maxWidth = 1
+            
+        
+        # Parametres in UI
+        
+        
+        self.addParameter(
+            QgsProcessingParameterNumber(
+                self.MAX_VALUE,
+                self.tr('Valeur maximale'),
+                minValue=0,
+                defaultValue = maxValue,
+                optional=False
+            )
+        )
+        
+        self.addParameter(
+            QgsProcessingParameterNumber(
+                self.MAX_WIDTH,
+                self.tr('Largeur associée en mètres'),
+                minValue=0,
+                defaultValue = maxWidth,
+                optional=False
+            )
+        )
+        
+        self.addParameter(
+            QgsProcessingParameterString(
+                self.VALUES_LIST,
+                self.tr('Valeurs à représenter (exemple : 3000;1000;300)'),
+                optional=True
+            )
+        )
+        
+        # Advanced parameters only for batch processing (Legend position)
+        
+        params = []
+        
+        params.append(
+            QgsProcessingParameterString(
+                self.XY_LEGEND,
+                self.tr('Position X,Y de la légende'),
+                optional=True
+            )
+        )
+        
+        for param in params:
+            param.setFlags(param.flags() | QgsProcessingParameterDefinition.FlagHidden)
+            self.addParameter(param)
+
+            
+        # We add a feature sink in which to store our processed features (this
+        # usually takes the form of a newly created vector layer when the
+        # algorithm is run in QGIS).
+        
+        # Output layer
+        
+        self.addParameter(
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT, 
+                self.tr('Légende'), 
+                type=QgsProcessing.TypeVectorPolygon
+            )
+        )        
+        
+    def processAlgorithm(self, parameters, context, feedback):
+        """
+        Here is where the processing itself takes place.
+        """
+        
+        # parameters initialisation
+        
+        # invert order of representation -> squares, diamonds, circles/ovals
+        representation = 1
+        maxWidth = self.parameterAsInt(parameters,self.MAX_WIDTH,context)
+        maxValue = self.parameterAsInt(parameters,self.MAX_VALUE,context)  
+        valueList = self.parameterAsString(parameters, self.VALUES_LIST , context)
+        legendCustomValues = valueList.strip().replace(';',' ').split()
+        coordsLegendText = self.parameterAsString(parameters, self.XY_LEGEND , context)
+        
+        project = QgsProject.instance()
+        
+        # save the parameters as project variable
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesRepresentation',representation)
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesMaxValue',maxValue)
+        QgsExpressionContextUtils.setProjectVariable(project,'thematic_circlesmaxWidth',maxWidth)
+        
+        # set a global variable for layer styling in postprocessing
+        self.representation = representation
+        
+        feedback.pushInfo('____________________')
+        feedback.pushInfo('')
+        feedback.pushInfo(self.tr("     Échelle des flèches :"))
+        feedback.pushInfo('')    
+        feedback.pushInfo(self.tr('     • Val : {0}'.format(maxValue)))   
+        feedback.pushInfo(self.tr('     • Largeur : {0}'.format(maxWidth)))              
+        feedback.pushInfo('')   
+
+        # set the legend  coordinates
+        
+        if len(coordsLegendText) >0 :
+            # with coordinates parameters
+            legendCoordsList = coordsLegendText.strip().split(',')
+            coordsLegend =[float(item) for item in legendCoordsList ]
+            xLegend = coordsLegend[0]
+            yLegend = coordsLegend[1]
+        else:
+            # no coordinates given
+            # -> center the legend in the canevas
+            canevasExtent = iface.mapCanvas().extent()
+            xLegend = (canevasExtent.xMaximum()+canevasExtent.xMinimum() )/2
+            yLegend = (canevasExtent.yMaximum()+canevasExtent.yMinimum() )/2
+
+        # coeff = maxWidth * (math.pi/maxValue)**.5
+        Value = maxValue
+        
+        # values to represent in the legend
+        
+
+            
+        if len(legendCustomValues) > 0:
+            try:
+                # legendCustomValues = sorted(legendCustomValues, reverse= True)
+                legendCustomValues =sorted([float(item) for item in legendCustomValues ], reverse = True)
+                feedback.pushInfo(self.tr('     • Liste des valeurs à afficher : {0}'.format(legendCustomValues))) 
+            except:
+                feedback.reportError(self.tr('     • Saisie de la liste des valeurs à afficher incorrecte :  {0}'.format(legendCustomValues)))
+                legendCustomValues = (maxValue,maxValue/2)
+                feedback.reportError(self.tr('     • Remplacement par les valeurs par défaut : {0}'.format(legendCustomValues)))
+        else:
+            legendCustomValues = (maxValue,maxValue/2)
+            feedback.pushInfo(self.tr('     • Liste des valeurs à afficher : {0}'.format(legendCustomValues))) 
+            
+        feedback.pushInfo('')
+        
+        # create a temporary line layer
+        crsString = project.crs().authid()
+        vl = QgsVectorLayer("LineString?crs="+crsString, "temp", 'memory')
+        from qgis.PyQt.QtCore import QVariant
+        pr = vl.dataProvider()
+        pr.addAttributes([QgsField("VAL", QVariant.Double),
+                          QgsField("WIDTH", QVariant.Double)])
+        vl.updateFields() 
+        
+        x = xLegend
+        y = yLegend
+            
+        for i in legendCustomValues:
+            width = i * maxWidth/maxValue
+            f = QgsFeature()
+            f.setGeometry(QgsGeometry.fromPolyline([QgsPoint(x,y),QgsPoint(x+maxWidth*2,y)]))
+            f.setAttributes([i, width])
+            pr.addFeature(f)
+            y -= (width + 0.2*maxWidth) 
+        vl.updateExtents() 
+        
+        feedback.pushInfo(self.tr('    Coordonnées de la légende :'))
+        feedback.pushInfo("      • X :    {0}".format(xLegend))
+        feedback.pushInfo("      • Y :    {0}".format(yLegend))
+        
+        (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
+                                               pr.fields(), QgsWkbTypes.LineString , vl.crs()) 
+        
+                          
+        feedback.pushInfo('____________________')
+        feedback.pushInfo('')
+             
+        # Add features to the sink
+        features = vl.getFeatures()
+        for feature in features:
+            sink.addFeature(feature, QgsFeatureSink.FastInsert)   
+            
+        # Return the results of the algorithm. 
+        
+        self.dest_id = dest_id
+        return {self.OUTPUT: dest_id}
+        
+    def postProcessAlgorithm(self, context, feedback):
+
+
+        # Apply a symbology to the legend
+        output = QgsProcessingUtils.mapLayerFromString(self.dest_id, context)
+        path = os.path.dirname(__file__) + '/styles/arrows_legend.qml'        
+        output.loadNamedStyle(path)
+        output.triggerRepaint()
+        return {self.OUTPUT: self.dest_id}
+
+        
+    def shortHelpString(self):
+        return self.tr("...")
+
+                       
+    def name(self):
+        """
+        Returns the algorithm name, used for identifying the algorithm. This
+        string should be fixed for the algorithm, and must not be localised.
+        The name should be unique within each provider. Names should contain
+        lowercase alphanumeric characters only and no spaces or other
+        formatting characters.
+        """
+        return 'arrowslegend'
+
+    def displayName(self):
+        """
+        Returns the translated algorithm name, which should be used for any
+        user-visible display of the algorithm name.
+        """
+        return self.tr('Générer une légende seule')
+
+    def group(self):
+        """
+        Returns the name of the group this algorithm belongs to. This string
+        should be localised.
+        """
+        return self.tr('Flux et déplacements')
+
+    def groupId(self):
+        """
+        Returns the unique ID of the group this algorithm belongs to. This
+        string should be fixed for the algorithm, and must not be localised.
+        The group id should be unique within each provider. Group id should
+        contain lowercase alphanumeric characters only and no spaces or other
+        formatting characters.
+        """
+        return 'flows'
+
+    def tr(self, string):
+        return QCoreApplication.translate('Processing', string)
+
+    def createInstance(self):
+        return CreateArrowsLegendAlgorithm()
+
+    def icon(self):
+        return QIcon(os.path.dirname(__file__) + '/images/fleches_leg.png')

@@ -49,6 +49,7 @@ from .FlowsAlgorithms import CreateArrowsAlgorithm
 from .FlowsAlgorithms import CreateCustomArrowsAlgorithm
 from .FlowsAlgorithms import CreateSaphirArrowsAlgorithm
 from .FlowsAlgorithms import CreateCustomSaphirArrowsAlgorithm
+from .FlowsAlgorithms import CreateArrowsLegendAlgorithm
 
 class ThematicProvider(QgsProcessingProvider):
 
@@ -82,7 +83,8 @@ class ThematicProvider(QgsProcessingProvider):
                    CreateArrowsAlgorithm(),
                    CreateCustomArrowsAlgorithm(),
                    CreateSaphirArrowsAlgorithm(),
-                   CreateCustomSaphirArrowsAlgorithm()]
+                   CreateCustomSaphirArrowsAlgorithm(),
+                   CreateArrowsLegendAlgorithm()]
                        
         for elem in alglist:
             self.addAlgorithm(elem)
