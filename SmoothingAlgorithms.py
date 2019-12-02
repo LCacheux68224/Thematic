@@ -967,7 +967,7 @@ class DissolveAlgorithm(QgsProcessingAlgorithm):
         else:        
             crs = source.crs().authid()
             contour = self.parameterAsSource(parameters, self.INPUT, context)
-            feedback.pushInfo("contour : {0}".format(contour.sourceName()))
+            # feedback.pushInfo("contour : {0}".format(contour.sourceName()))
             
             CELL_SIZE = self.parameterAsInt( parameters, self.CELL_SIZE, context )
             # Layer extent
