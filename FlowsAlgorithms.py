@@ -700,7 +700,13 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
 
         addLegend = self.parameterAsBool(parameters,self.ADD_LEGEND,context)
         
-        # feedback.pushInfo("      • maximumExtent :    {0}".format(maximumExtent))        
+        originField = self.parameterAsString(parameters, self.ORIGIN , context)
+        destinationField = self.parameterAsString(parameters, self.DESTINATION , context)        
+        expressionString = '{0} != {1} AND {0} IS NOT NULL AND {1} IS NOT NULL'.format(originField,destinationField)
+        extractedFeatures = processing.run("native:extractbyexpression", 
+                {'INPUT':inputTable,
+                 'EXPRESSION': expressionString,
+                 'OUTPUT':'memory:'})
 
         crsString = geometryLayer.crs().authid() 
         
@@ -750,16 +756,16 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo('Flèches joingnantes avec échelle automatique')
         feedback.pushInfo(' ')
         feedback.pushInfo("      Variables")
-        originField = self.parameterAsString(parameters, self.ORIGIN , context)
-        originFieldIndex = inputTable.fields().indexOf(originField)
+        
+        originFieldIndex = extractedFeatures['OUTPUT'].fields().indexOf(originField)
         feedback.pushInfo("      • Origine :    {0}, [{1}]".format(originField,originFieldIndex+1))
         
-        destinationField = self.parameterAsString(parameters, self.DESTINATION , context)
-        destinationFieldIndex = inputTable.fields().indexOf(destinationField)
+        
+        destinationFieldIndex = extractedFeatures['OUTPUT'].fields().indexOf(destinationField)
         feedback.pushInfo("      • Destination :    {0}, [{1}]".format(destinationField,destinationFieldIndex+1))
         
         valueField = self.parameterAsString(parameters, self.STOCK , context)
-        valueFieldIndex = inputTable.fields().indexOf(valueField)
+        valueFieldIndex = extractedFeatures['OUTPUT'].fields().indexOf(valueField)
         feedback.pushInfo("      • Flux :    {0}, [{1}]".format(valueField,valueFieldIndex+1))
 
         feedback.pushInfo("      Filtrage")
@@ -779,7 +785,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         
         notInLayer = 0
         
-        maxValue = max([abs(item.attributes()[valueFieldIndex]) for item in inputTable.getFeatures()]) 
+        maxValue = max([abs(item.attributes()[valueFieldIndex]) for item in extractedFeatures['OUTPUT'].getFeatures()]) 
 
         self.maxValue = maxValue
         self.maxWidth = (maximumExtent)/30
@@ -791,7 +797,7 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo("     Échelle :    ")
         feedback.pushInfo("      • valeur maximale :    {0}".format(self.maxValue))
         feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth))
-        for elem in inputTable.getFeatures():
+        for elem in extractedFeatures['OUTPUT'].getFeatures():
             value = float(elem.attributes()[valueFieldIndex])
             try:
                 pointA = coordinatesDictionnary[elem.attributes()[originFieldIndex]]
@@ -1213,7 +1219,13 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
         maxValueScale = self.parameterAsInt(parameters,self.MAX_VALUE_SCALE,context)
         maxWidthScale = self.parameterAsInt(parameters,self.MAX_WIDTH_SCALE,context)
         addLegend = self.parameterAsBool(parameters,self.ADD_LEGEND,context)        
-        # feedback.pushInfo("      • maximumExtent :    {0}".format(maximumExtent))        
+        originField = self.parameterAsString(parameters, self.ORIGIN , context)
+        destinationField = self.parameterAsString(parameters, self.DESTINATION , context)        
+        expressionString = '{0} != {1} AND {0} IS NOT NULL AND {1} IS NOT NULL'.format(originField,destinationField)
+        extractedFeatures = processing.run("native:extractbyexpression", 
+                {'INPUT':inputTable,
+                 'EXPRESSION': expressionString,
+                 'OUTPUT':'memory:'})
 
         crsString = geometryLayer.crs().authid() 
         
@@ -1265,15 +1277,15 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(' ')
         feedback.pushInfo("      Variables")
         originField = self.parameterAsString(parameters, self.ORIGIN , context)
-        originFieldIndex = inputTable.fields().indexOf(originField)
+        originFieldIndex = extractedFeatures['OUTPUT'].fields().indexOf(originField)
         feedback.pushInfo("      • Origine :    {0}, [{1}]".format(originField,originFieldIndex+1))
         
         destinationField = self.parameterAsString(parameters, self.DESTINATION , context)
-        destinationFieldIndex = inputTable.fields().indexOf(destinationField)
+        destinationFieldIndex = extractedFeatures['OUTPUT'].fields().indexOf(destinationField)
         feedback.pushInfo("      • Destination :    {0}, [{1}]".format(destinationField,destinationFieldIndex+1))
         
         valueField = self.parameterAsString(parameters, self.STOCK , context)
-        valueFieldIndex = inputTable.fields().indexOf(valueField)
+        valueFieldIndex = extractedFeatures['OUTPUT'].fields().indexOf(valueField)
         feedback.pushInfo("      • Flux :    {0}, [{1}]".format(valueField,valueFieldIndex+1))
         feedback.pushInfo("      Filtrage")
         minValue = self.parameterAsDouble(parameters, self.MIN_FLOW , context)
@@ -1292,7 +1304,7 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
         
         notInLayer = 0
         
-        maxValue = max([abs(item.attributes()[valueFieldIndex]) for item in inputTable.getFeatures()]) 
+        maxValue = max([abs(item.attributes()[valueFieldIndex]) for item in extractedFeatures['OUTPUT'].getFeatures()]) 
         if maxValueScale ==0:
             self.maxValue = maxValue
         else: 
@@ -1309,7 +1321,7 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo("     Échelle :    ")
         feedback.pushInfo("      • valeur maximale :    {0}".format(self.maxValue))
         feedback.pushInfo("      • largeur maximale :    {0} m".format(self.maxWidth))
-        for elem in inputTable.getFeatures():
+        for elem in extractedFeatures['OUTPUT'].getFeatures():
             value = float(elem.attributes()[valueFieldIndex])
             try:
                 pointA = coordinatesDictionnary[elem.attributes()[originFieldIndex]]
