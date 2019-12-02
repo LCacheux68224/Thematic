@@ -38,6 +38,8 @@ from qgis.core import QgsProcessingProvider
 from .SmoothingAlgorithms import CreateBtbGridAlgorithm
 from .SmoothingAlgorithms import CreateInspireGridAlgorithm
 from .SmoothingAlgorithms import SmoothToGridAlgorithm
+from .SmoothingAlgorithms import DissolveAlgorithm
+
 
 from .CirclesAlgorithms import CreateAutomaticSymbolsAlgorithm
 from .CirclesAlgorithms import CreateCustomSymbolsAlgorithm
@@ -75,6 +77,7 @@ class ThematicProvider(QgsProcessingProvider):
         alglist = [CreateBtbGridAlgorithm(),
                    SmoothToGridAlgorithm(),
                    CreateInspireGridAlgorithm(),
+                   DissolveAlgorithm(),
                    CreateAutomaticSymbolsAlgorithm(),
                    CreateCustomSymbolsAlgorithm(),
                    CreateCirclesLegendAlgorithm(),

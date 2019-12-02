@@ -55,7 +55,12 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterFile,
                        QgsWkbTypes,
                        QgsProcessingParameterDefinition,
-                       QgsFeature)
+                       QgsFeature,
+                       QgsProcessingUtils,
+                       QgsSymbol,
+                       QgsCategorizedSymbolRenderer,
+                       QgsSimpleFillSymbolLayer,
+                       QgsRendererCategory)
 import processing
 import tempfile
 import shutil
@@ -65,7 +70,7 @@ import os
 from sys import platform
 import subprocess
 import locale
-
+from qgis.utils import iface
 # --------------------------- #
 # Create a grid from a layer  #
 # --------------------------- #
@@ -143,8 +148,6 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
         source2 = source.materialize(QgsFeatureRequest())
         crs = source2.crs().authid()
         
-        # OUTPUT_LAYER = self.parameterAsOutputLayer(parameters,self.OUTPUT_LAYER,context)
-        
         CELL_SIZE = self.parameterAsInt( parameters, self.CELL_SIZE, context )
         # Layer extent
         layerExtent = source2.extent()
@@ -180,7 +183,8 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
                 {'INPUT':grille['OUTPUT'],
                  'PREDICATE':[0],
                  'INTERSECT':source2,
-                 'METHOD':0},feedback=None)
+                 'METHOD':0},
+                 feedback=None)
                             
         # On ne garde que les carreaux selectionnes
         result1 = processing.run("native:saveselectedfeatures", 
@@ -190,7 +194,7 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
         # Ajout des colonnes ID, x et y
         result2 = processing.run("qgis:refactorfields", 
                         {'INPUT':result1['OUTPUT'],
-                             'FIELDS_MAPPING':[{'expression': 'to_string("left" +500)+\'_\'+to_string("bottom"+500)', 
+                             'FIELDS_MAPPING':[{'expression': 'to_string(to_int("left" +500))|| \'_\' || to_string(to_int("bottom"+500))', 
                                  'length': 25, 
                                  'name': 'ID', 
                                  'precision': 0, 
@@ -736,15 +740,11 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         # to uniquely identify the feature sink, and must be included in the
         # dictionary returned by the processAlgorithm function.
         
-        # INPUT = parameters[self.INPUT]
-        # print(self.INPUT.extent())
-        # print(INPUT)
         source = self.parameterAsSource(parameters, self.INPUT, context)
         source2 = source.materialize(QgsFeatureRequest())
         crs = source2.crs().authid()
         extentZone = str(self.parameterAsString(parameters, self.EXTENT , context))
         CELL_SIZE = self.parameterAsInt( parameters, self.CELL_SIZE, context )
-        # OUTPUT = self.parameterAsOutputLayer(parameters,self.OUTPUT,context)
         
         crsList = {"0": "3035", "1": "5490", "2":"2975", "3":"2972", "4":"4471", "5":"4467", "6":"4467"}
         crsCode = crsList[extentZone]
@@ -789,7 +789,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
                          'VOVERLAY':0,
                          'CRS':'EPSG:'+crsCode,
                          'OUTPUT':'memory:'},
-                         feedback=feedback)
+                         feedback=None)
 
 
         # Selection des carreaux utiles
@@ -799,7 +799,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
                          'PREDICATE':[0],
                          'INTERSECT':temp1['OUTPUT'],
                          'METHOD':0},
-                         feedback=feedback)
+                         feedback=None)
 
         # On ne garde que les carreaux selectionnes
         result1 = processing.run("native:saveselectedfeatures", 
@@ -809,11 +809,6 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
             
         refactorfieldsExpression = "'CRS" + crsCode + "RES"+ str(CELL_SIZE) + "mN'" + ' + to_string("bottom") + ' + "'E'" + ' + to_string("left")' 
         refactorfieldsExpression_1k = "'CRS" + crsCode + "RES"+ str('1000') + "mN'" + ' + to_string(1000*to_int(floor("bottom"/1000))) + ' + "'E'" + ' + to_string(1000*to_int(floor("left"/1000)))' 
-        refactorfieldsExpression_2k = "'CRS" + crsCode + "RES"+ str('2000') + "mN'" + ' + to_string(2000*floor("bottom"/2000)) + ' + "'E'" + ' + to_string(2000*floor("left"/2000))' 
-        refactorfieldsExpression_4k = "'CRS" + crsCode + "RES"+ str('4000') + "mN'" + ' + to_string(4000*floor("bottom"/4000)) + ' + "'E'" + ' + to_string(4000*floor("left"/4000))' 
-        refactorfieldsExpression_8k = "'CRS" + crsCode + "RES"+ str('8000') + "mN'" + ' + to_string(8000*floor("bottom"/8000)) + ' + "'E'" + ' + to_string(8000*floor("left"/8000))' 
-        refactorfieldsExpression_16k = "'CRS" + crsCode + "RES"+ str('16000') + "mN'" + ' + to_string(16000*floor("bottom"/16000)) + ' + "'E'" + ' + to_string(16000*floor("left"/16000))' 
-        refactorfieldsExpression_32k = "'CRS" + crsCode + "RES"+ str('32000') + "mN'" + ' + to_string(32000*floor("bottom"/32000)) + ' + "'E'" + ' + to_string(32000*floor("left"/32000))' 
         
         # Ajout des colonnes ID, x et y
         feedback.pushDebugInfo(self.tr("Ajout des identifiants Inspire..."))
@@ -886,5 +881,281 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         return CreateInspireGridAlgorithm()
 
     def icon(self):
-        return QIcon(os.path.dirname(__file__) + '/images/grid.png')
-		
+        return QIcon(os.path.dirname(__file__) + '/images/grid0.png')
+    
+    
+class DissolveAlgorithm(QgsProcessingAlgorithm):
+    """
+    This is an example algorithm that takes a vector layer and
+    creates a new identical one.
+
+    It is meant to be used as an example of how to create your own
+    algorithms and explain methods and variables used to do it. An
+    algorithm like this will be available in all elements, and there
+    is not need for additional work.
+
+    All Processing algorithms should extend the QgsProcessingAlgorithm
+    class.
+    """
+
+    # Constants used to refer to parameters and outputs. They will be
+    # used when calling the algorithm from another algorithm, or when
+    # calling from the QGIS console.
+
+    OUTPUT = 'OUTPUT'
+    CELL_SIZE = 'CELL_SIZE'
+    INPUT = 'INPUT'
+
+    def initAlgorithm(self, config):
+        """
+        Here we define the inputs and output of the algorithm, along
+        with some other properties.
+        """
+
+        # We add the input vector features source. It can have any kind of
+        # geometry.
+        
+        self.addParameter(
+            QgsProcessingParameterNumber(
+                self.CELL_SIZE,
+                self.tr('Maille du carreau de la grille lissée (en mètres)'),
+                defaultValue=1000,
+                minValue=1,
+                optional=False
+            )
+        )
+        
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT,
+                self.tr("Contour du territoire lissé"),
+                [QgsProcessing.TypeVectorPolygon],
+                optional = True
+            )
+        ) 
+        # We add a feature sink in which to store our processed features (this
+        # usually takes the form of a newly created vector layer when the
+        # algorithm is run in QGIS).
+
+        self.addParameter(
+            QgsProcessingParameterFeatureSink(
+                self.OUTPUT,
+                self.tr("Carreaux regroupés"), 
+                type=QgsProcessing.TypeVectorPolygon
+            )
+        )
+            
+    def processAlgorithm(self, parameters, context, feedback):
+        """
+        Here is where the processing itself takes place.
+        """
+
+        # Retrieve the feature source and sink. The 'dest_id' variable is used
+        # to uniquely identify the feature sink, and must be included in the
+        # dictionary returned by the processAlgorithm function.
+        
+        source = iface.activeLayer()
+        type = source.renderer().type()
+        if type != 'graduatedSymbol':
+            try:
+                raise NameError("InputError")
+            except:
+                feedback.pushInfo(" ")
+                feedback.reportError("     • Pas de discrétisation trouvée !…")
+                feedback.pushInfo(" ")
+                raise
+        else:        
+            crs = source.crs().authid()
+            contour = self.parameterAsSource(parameters, self.INPUT, context)
+            feedback.pushInfo("contour : {0}".format(contour.sourceName()))
+            
+            CELL_SIZE = self.parameterAsInt( parameters, self.CELL_SIZE, context )
+            # Layer extent
+            layerExtent = source.extent()
+            xmin = (math.floor(layerExtent.xMinimum()/CELL_SIZE)*CELL_SIZE)
+            ymin = (math.floor(layerExtent.yMinimum()/CELL_SIZE)*CELL_SIZE)
+            xmax = (math.floor(layerExtent.xMaximum()/CELL_SIZE)*CELL_SIZE+CELL_SIZE)
+            ymax = (math.floor(layerExtent.yMaximum()/CELL_SIZE)*CELL_SIZE+CELL_SIZE)
+            
+            # layerExtentList = [xmin,xmax,ymin,ymax]
+            layerExtent = "{0},{1},{2},{3} [{4}]".format(xmin,xmax,ymin,ymax,crs)
+            feedback.pushInfo('____________________')
+            feedback.pushInfo('')
+            feedback.pushInfo(self.tr("Regroupement des carreaux après lissage BTB"))
+            feedback.pushInfo('')    
+            feedback.pushInfo(self.tr('     • Grille lissée : {0}'.format(source.sourceName())))
+            feedback.pushInfo(self.tr('     • Maille : {0} m'.format(CELL_SIZE)))
+            feedback.pushInfo(self.tr('     • Étendue de la couche : {0}'.format(layerExtent)))
+            feedback.pushInfo(self.tr('     • SCR : {0}'.format(crs)))
+            
+            # 
+            variable = source.renderer().classAttribute()
+            feedback.pushInfo(self.tr('     • variable : {0}'.format(variable)))
+
+
+        
+            feedback.pushInfo(self.tr('     • type : {0}'.format(type)))
+            
+            formula = 'CASE '
+            i = 1
+            self.classes = []
+            for item in source.renderer().ranges():
+                formula += 'WHEN {0} >= {1} and {0} <= {2} then {3} \n'.format(variable,item.lowerValue(),item.upperValue(),i)
+                # bornes = (item.upperValue(), item.lowerValue(), item.label())
+                self.classes.append((item.label(),item.symbol().color().name()))
+                i += 1
+            formula += 'END'
+            # feedback.pushInfo(self.tr('     • classes : \n{0}'.format(self.classes)))
+            # feedback.pushInfo(self.tr('     • formula : \n{0}'.format(formula)))
+            result = processing.run("qgis:refactorfields", 
+                    {'INPUT': source,
+                     'FIELDS_MAPPING':[
+                        {'expression': '{0}'.format(formula), 
+                         'length': 1, 
+                         'name': 'CLASSE', 
+                         'precision': 0, 
+                         'type': 2
+                        }],
+                     'OUTPUT':'memory:'},
+                         feedback = None)
+                         
+            dirpath = tempfile.mkdtemp()
+            self.dirpath = dirpath
+            sortie = str(re.sub('\\\\','/',dirpath) + "/raster.tif")
+            
+            raster = processing.run("gdal:rasterize", 
+                    {'INPUT':result['OUTPUT'],
+                     'FIELD':'CLASSE',
+                     'BURN':0,
+                     'UNITS':1,
+                     'WIDTH':CELL_SIZE,
+                     'HEIGHT':CELL_SIZE,
+                     'EXTENT':layerExtent,
+                     'NODATA':0,
+                     'OPTIONS':'',
+                     'DATA_TYPE':5,
+                     'INIT':None,
+                     'INVERT':False,
+                     'OUTPUT':sortie},
+                         feedback = None)
+            vectorLayer = str(re.sub('\\\\','/',dirpath) + "/vecteur.gpkg")
+            
+            smoothedLayer = processing.run("grass7:r.to.vect", 
+                    {'input':raster['OUTPUT'],
+                     'type':2,
+                     'column':'value',
+                     '-s':True,
+                     '-v':False,
+                     '-z':False,
+                     '-b':False,
+                     '-t':False,
+                     'output':vectorLayer,
+                     'GRASS_REGION_PARAMETER':None,
+                     'GRASS_REGION_CELLSIZE_PARAMETER':CELL_SIZE,
+                     'GRASS_OUTPUT_TYPE_PARAMETER':0,
+                     'GRASS_VECTOR_DSCO':'',
+                     'GRASS_VECTOR_LCO':'',
+                     'GRASS_VECTOR_EXPORT_NOCAT':False},
+                         feedback = None)
+                         
+            fixedGeometries = processing.run("native:fixgeometries", 
+                    {'INPUT':vectorLayer,
+                     'OUTPUT':'memory:'},
+                         feedback = None)
+                         
+            if contour is None:
+                result = fixedGeometries        
+            else:
+                dissolvedContour = processing.run("native:dissolve", 
+                        {'INPUT':contour.materialize(QgsFeatureRequest()),
+                         'FIELD':[],
+                         'OUTPUT':'memory:'},
+                         feedback = None)
+                
+                result = processing.run("native:intersection", 
+                        {'INPUT':fixedGeometries['OUTPUT'],
+                         'OVERLAY':dissolvedContour['OUTPUT'],
+                         'INPUT_FIELDS':[],
+                         'OVERLAY_FIELDS':[],
+                         'OUTPUT':'memory:'},
+                         feedback = None)
+                
+            (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
+                                                   result['OUTPUT'].fields(), QgsWkbTypes.Polygon, result['OUTPUT'].crs())  
+
+            features = result['OUTPUT'].getFeatures()
+            for feature in features:
+                sink.addFeature(feature, QgsFeatureSink.FastInsert)
+                             
+            self.dest_id = dest_id
+            # shutil.rmtree(dirpath)
+            return {self.OUTPUT: 'dest_id'}
+        
+    def postProcessAlgorithm(self, context, feedback):
+        # Styling the output
+        output0 = QgsProcessingUtils.mapLayerFromString(self.dest_id, context)
+        categories = []
+        i = 1
+        
+        for classe in self.classes:
+            feedback.pushInfo("     • classe {0}: {1}".format(i,classe))
+            symbol = QgsSymbol.defaultSymbol(output0.geometryType())
+            layer_style = {}
+            layer_style['color'] = classe[1]
+            layer_style['outline_style'] = 'no'
+            symbol_layer = QgsSimpleFillSymbolLayer.create(layer_style)
+            if symbol_layer is not None:
+                symbol.changeSymbolLayer(0, symbol_layer)
+            category = QgsRendererCategory(i,symbol,classe[0])
+            categories.append(category)
+            i += 1
+        
+        renderer = QgsCategorizedSymbolRenderer('value', categories)
+        if renderer is not None:
+            output0.setRenderer(renderer)
+        output0.triggerRepaint()
+        shutil.rmtree(self.dirpath)
+        return {self.OUTPUT: self.OUTPUT}
+        
+    def name(self):
+        """
+        Returns the algorithm name, used for identifying the algorithm. This
+        string should be fixed for the algorithm, and must not be localised.
+        The name should be unique within each provider. Names should contain
+        lowercase alphanumeric characters only and no spaces or other
+        formatting characters.
+        """
+        return 'dissolve'
+
+    def displayName(self):
+        """
+        Returns the translated algorithm name, which should be used for any
+        user-visible display of the algorithm name.
+        """
+        return self.tr("Regrouper les carreaux de même classe après lissage")
+
+    def group(self):
+        """
+        Returns the name of the group this algorithm belongs to. This string
+        should be localised.
+        """
+        return self.tr('Carroyage et lissage')
+
+    def groupId(self):
+        """
+        Returns the unique ID of the group this algorithm belongs to. This
+        string should be fixed for the algorithm, and must not be localised.
+        The group id should be unique within each provider. Group id should
+        contain lowercase alphanumeric characters only and no spaces or other
+        formatting characters.
+        """
+        return 'smoothing'
+
+    def tr(self, string):
+        return QCoreApplication.translate('Processing', string)
+
+    def createInstance(self):
+        return DissolveAlgorithm()
+
+    def icon(self):
+        return QIcon(os.path.dirname(__file__) + '/images/grid2.png')
