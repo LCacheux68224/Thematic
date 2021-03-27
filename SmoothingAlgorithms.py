@@ -71,6 +71,8 @@ from sys import platform
 import subprocess
 import locale
 from qgis.utils import iface
+import configparser
+
 # --------------------------- #
 # Create a grid from a layer  #
 # --------------------------- #
@@ -108,7 +110,7 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr('Fond en entrée'),
+                self.tr('Input polygon layer'),
                 [QgsProcessing.TypeVectorPolygon]
             )
         ) 
@@ -116,7 +118,7 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.CELL_SIZE,
-                self.tr('Maille du carreau (en mètres)'),
+                self.tr('Cell size (in meters)'),
                 defaultValue=1000,
                 minValue=1,
                 optional=False
@@ -130,7 +132,7 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                self.tr("Grille BTB"), 
+                self.tr("Grid output layer"), 
                 type=QgsProcessing.TypeVectorPolygon
             )
         )
@@ -160,12 +162,12 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
         layerExtent = "{0},{1},{2},{3}".format(xmin,xmax,ymin,ymax)
         feedback.pushInfo('____________________')
         feedback.pushInfo('')
-        feedback.pushInfo(self.tr("Création d'une grille BTB"))
+        feedback.pushInfo(self.tr("Generating a btb grid"))
         feedback.pushInfo('')    
-        feedback.pushInfo(self.tr('     • Contour : {0}'.format(source.sourceName())))
-        feedback.pushInfo(self.tr('     • Maille : {0} m'.format(CELL_SIZE)))
-        feedback.pushInfo(self.tr('     • Étendue de la couche : {0}'.format(layerExtent)))
-        feedback.pushInfo(self.tr('     • SCR : {0}'.format(crs)))
+        feedback.pushInfo('     • '+self.tr('From the polygon layer')+' : {0}'.format(source.sourceName()))
+        feedback.pushInfo('     • '+self.tr('Cell size')+' : {0} m'.format(CELL_SIZE))
+        feedback.pushInfo('     • '+self.tr('Layer extent')+' : {0}'.format(layerExtent))
+        feedback.pushInfo('     • '+self.tr('CRS')+' : {0}'.format(crs))
         
         grille = processing.run("qgis:creategrid", 
                         {'TYPE':2,
@@ -190,21 +192,21 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
         result1 = processing.run("native:saveselectedfeatures", 
             {'INPUT':grille['OUTPUT'],
             'OUTPUT':'memory:'})
-
+        # "     • classe {0}: {1}".format(i,classe)	
         # Ajout des colonnes ID, x et y
         result2 = processing.run("qgis:refactorfields", 
                         {'INPUT':result1['OUTPUT'],
-                             'FIELDS_MAPPING':[{'expression': 'to_string(to_int("left" +500))|| \'_\' || to_string(to_int("bottom"+500))', 
+                             'FIELDS_MAPPING':[{'expression': 'to_string(to_int("left" +{0}))|| \'_\' || to_string(to_int("bottom"+{0}))'.format(int(CELL_SIZE/2)), 
                                  'length': 25, 
                                  'name': 'ID', 
                                  'precision': 0, 
                                  'type': 10}, 
-                             {'expression': 'left+500',
+                             {'expression': 'left+{0}'.format(int(CELL_SIZE/2)),
                                  'length': 24, 
                                  'name': 'x', 
                                  'precision': 0, 
                                  'type': 2}, 
-                             {'expression': 'bottom+500', 
+                             {'expression': 'bottom+{0}'.format(int(CELL_SIZE/2)), 
                                  'length': 24, 
                                  'name': 'y', 
                                  'precision': 0, 
@@ -212,7 +214,7 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
                          'OUTPUT':'memory:'},
                          feedback=None)
                          
-        feedback.pushDebugInfo(self.tr("Chargement de la grille..."))
+        feedback.pushDebugInfo(self.tr("Loading the grid..."))
         feedback.pushInfo('')
         
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
@@ -240,14 +242,14 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr("Générer une grille de lissage BTB à partir d'un contour")
+        return self.tr("Create a grid for btb smoothing from a polygon layer")
 
     def group(self):
         """
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Carroyage et lissage')
+        return self.tr('Grids and smoothing')
 
     def groupId(self):
         """
@@ -260,7 +262,7 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
         return 'smoothing'
 
     def tr(self, string):
-        return QCoreApplication.translate('Processing', string)
+        return QCoreApplication.translate('CreateBtbGridAlgorithm', string)
 
     def createInstance(self):
         return CreateBtbGridAlgorithm()
@@ -312,7 +314,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr('Fond ou table de données en entrée'),
+                self.tr('Input datas (layer or table)'),
                 [QgsProcessing.TypeVector]
             )
         )
@@ -337,7 +339,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
 
         self.addParameter(QgsProcessingParameterField(
                 self.VAR_LIST,
-                self.tr('Liste des variables à lisser'),
+                self.tr('Values to smooth'),
                 None, 
                 self.INPUT, 
                 QgsProcessingParameterField.Numeric, 
@@ -346,7 +348,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         )
         self.addParameter(QgsProcessingParameterNumber(
                 self.CELL_SIZE,
-                self.tr('Taille des carreaux (en m)'),
+                self.tr('Cell size (in meters)'),
                 defaultValue=1000,
                 minValue = 1,
                 optional=False
@@ -354,7 +356,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         )
         self.addParameter(QgsProcessingParameterNumber(
                 self.BANDWIDTH,
-                self.tr('Rayon de lissage (en m)'),
+                self.tr('Smothing radius (in meters)'),
                 defaultValue=15000,
                 minValue = 1,
                 optional=False
@@ -364,7 +366,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFile(
                 self.GRID,
-                self.tr('Grille Shapefile prédéfinie'),
+                self.tr('Empty grid'),
                 optional = True
             )
         )        
@@ -372,7 +374,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         params.append(
             QgsProcessingParameterString(
                 self.QUANTILE_LIST,
-                self.tr('Liste des quantiles à calculer (exemple: 0.1;0.25;0.5)'),
+                self.tr('Percentile vector to calculate (example: 0.1;0.25;0.5)'),
                 optional=True
             )
         )
@@ -387,7 +389,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                self.tr('Grille lissée')
+                self.tr('Smoothed grid')
             )
         )
 
@@ -396,10 +398,20 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         Here is where the processing itself takes place.
         """
         # codecNomsFichiers = locale.getpreferredencoding()
+                
+        feedback.pushInfo(" ")
+        feedback.pushInfo("BTB smoothing (with R and btb package) ")                
+        
+        # emplacement de R
+        config = configparser.ConfigParser()
+        config.read(re.sub('\\\\','/',os.path.dirname(__file__)) + '/thematic.cfg')
+
+        RFolder = config['R']['R_FOLDER']
+        feedback.pushInfo("      • emplacement de R : {0}".format(RFolder))
         
         if platform == 'win32':
             execDir = 'x64'
-            command = ['C:/Program Files/R/R-3.3.3/bin/Rscript.exe','-e' ,'getRversion()']
+            command = [RFolder+'/bin/x64/Rscript.exe','-e' ,'getRversion()']
         else:
             command = ['R --version']
  
@@ -409,9 +421,14 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
             stdout=subprocess.PIPE,
             stdin=open(os.devnull),
             stderr=subprocess.STDOUT,
-            universal_newlines=True,
+            universal_newlines=True
         )
         stdout, stderr  = proc.communicate()
+        versionR = re.findall("'(\d.+)'",stdout)[0]        
+
+        feedback.pushInfo('     • {0} : {1}'.format(self.tr("R version"),versionR))
+        feedback.pushInfo(" ")        
+                
         # Retrieve the feature source and sink. The 'dest_id' variable is used
         # to uniquely identify the feature sink, and must be included in the
         # dictionary returned by the processAlgorithm function.
@@ -462,145 +479,56 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         if quantileList =='' :
             quantileList = 'NULL'
 
-        command = ['C:/Program Files/R/R-3.3.3/bin/x64/Rscript.exe','-e' ,'getRversion()']
+        
 
-        proc = subprocess.Popen(
-            command,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stdin=open(os.devnull),
-            stderr=subprocess.STDOUT,
-            universal_newlines=True,
-        )
-        stdout, stderr  = proc.communicate()  
-        versionR = re.findall("'(\d.+)'",stdout)[0]
-        
-        feedback.pushInfo(" ")
-        feedback.pushInfo("Lissage BTB (Package R - Beyond The Border) ")
-        
-        feedback.pushInfo("      • version de R :    {0}".format(versionR))
-        feedback.pushInfo(" ")
         if grid != '':
-            feedback.pushInfo("      • Grille prédéfinie:    {0}".format(grid))
+            feedback.pushInfo('     • '+self.tr("Empty grid defined")+" :    {0}".format(grid))
         else:
-            feedback.pushInfo("      • Pas de grille prédéfinie")
+            feedback.pushInfo('     • '+self.tr("No empty grid used"))
         cellsize = self.parameterAsInt(parameters,self.CELL_SIZE,context)
         bandwidth = self.parameterAsInt(parameters,self.BANDWIDTH,context)
-        feedback.pushInfo("      • liste des variables à lisser:    {0}".format(varList))
-        feedback.pushInfo("      • Maille :    {0} m".format(cellsize))
-        feedback.pushInfo("      • Rayon de lissage :    {0} m".format(bandwidth))
+        feedback.pushInfo('     • '+self.tr("Values to smooth")+" :    {0}".format(varList))
+        feedback.pushInfo('     • '+self.tr("Cell size")+" :    {0} m".format(cellsize))
+        feedback.pushInfo('     • '+self.tr("Smoothing radius")+" :    {0} m".format(bandwidth))
         if quantileList != 'NULL':
-            feedback.pushInfo("      • Liste des quantiles :    {0}".format(quantileList))
+            feedback.pushInfo('     • '+self.tr("Pertentile to calculate")+" :    {0}".format(quantileList))
         else:
-            feedback.pushInfo("      • Pas de quantiles demandés")
+            feedback.pushInfo('     • '+self.tr("No percentile"))
         feedback.pushInfo(" ")
         if grid != '':
             scriptR = re.sub('\\\\','/',os.path.dirname(__file__)) + '/rscript/lissageGrille.R'
-            sortieLissage = str(re.sub('\\\\','/',dirpath) + "/lissage.csv")
-            args = [sortie, str(cellsize), str(bandwidth), quantileList, re.sub('\.shp','.dbf',grid),sortieLissage, RlibFolder]
-            command = ['C:/Program Files/R/R-3.3.3/bin/x64/Rscript.exe','--vanilla',scriptR]+args
-            feedback.pushInfo("      • commande :\n{0}".format(command))
+            crsString = QgsProject.instance().crs().authid()
+            crsCode = str(crsString.split(':')[1])                                                            
+            sortieLissage = str(re.sub('\\\\','/',dirpath) + "/lissage.gpkg")
+            args = [sortie, str(cellsize), str(bandwidth), quantileList, crsCode, grid,sortieLissage, RlibFolder]
+            command = [RFolder+'/bin/x64/Rscript.exe','--vanilla',scriptR]+args
+            feedback.pushInfo('     • {0} :\n{1}'.format(self.tr("Command"),command))
             
             proc = subprocess.run(
                 command,
                 shell=True, check=False
             )
             
-            filepath = sortieLissage
-            with open(filepath) as fp:
-                line = fp.readline()
-            fp.close()
-            
-            varList2 = line.replace('"',"").split(',')[3:-1] 
-            
-            result = processing.run("native:joinattributestable", 
-                    {'INPUT':grid,
-                     'FIELD':'ID',
-                     'INPUT_2':sortieLissage,
-                     'FIELD_2':'ID',
-                     'FIELDS_TO_COPY':varList2,
-                     'METHOD':1,'DISCARD_NONMATCHING':False,
-                     'PREFIX':'',
-                     'OUTPUT':'memory:'})
-            
+            result = processing.run("native:fixgeometries", 
+                                    {'INPUT':sortieLissage,
+                                    'OUTPUT':'memory:'})
         else:
             scriptR = re.sub('\\\\','/',os.path.dirname(__file__)) + '/rscript/schematisation.R'
             crsString = QgsProject.instance().crs().authid()
+            feedback.pushInfo('     • {0} :\n{1}'.format(self.tr("crsString"),crsString))
             crsCode = str(crsString.split(':')[1])
-            sortieLissage = str(re.sub('\\\\','/',dirpath) + "/lissage.csv")
+            sortieLissage = str(re.sub('\\\\','/',dirpath) + "/lissage.gpkg")
             args = [sortie, str(cellsize), str(bandwidth), quantileList, crsCode,sortieLissage, RlibFolder]
-            command = ['C:/Program Files/R/R-3.3.3/bin/x64/Rscript.exe','--vanilla',scriptR]+args
-            feedback.pushInfo("      • commande :\n{0}".format(command))
+            command = [RFolder+'/bin/x64/Rscript.exe',scriptR]+args
+            feedback.pushInfo('     • {0} :\n{1}'.format(self.tr("Command"),command))
             proc = subprocess.run(
                 command,
                 shell=True, check=False
             )
             
-            summaryX = processing.run("qgis:basicstatisticsforfields", 
-                            {'INPUT_LAYER':sortieLissage,
-                                'FIELD_NAME':'x'
-                            },
-                            feedback = None)
-            summaryY = processing.run("qgis:basicstatisticsforfields", 
-                            {'INPUT_LAYER':sortieLissage,
-                                'FIELD_NAME':'y'
-                            },
-                            feedback = None)
-                            
-            layerExtent = "{0},{1},{2},{3}".format(float(summaryX['MIN'])+cellsize/2,
-                                                   float(summaryX['MAX'])-cellsize/2,
-                                                   float(summaryY['MIN'])+cellsize/2,
-                                                   float(summaryY['MAX'])-cellsize/2)
-            
-            grille = processing.run("qgis:creategrid", 
-                            {'TYPE':2,
-                             'EXTENT':layerExtent,
-                             'HSPACING':cellsize,
-                             'VSPACING':cellsize,
-                             'HOVERLAY':0,
-                             'VOVERLAY':0,
-                             'CRS':crsString,
-                             'OUTPUT':'memory:'},
-                             feedback=None)
-            
-            # Ajout des colonnes ID, x et y
-            result2 = processing.run("qgis:refactorfields", 
-                            {'INPUT':grille['OUTPUT'],
-                                 'FIELDS_MAPPING':[{'expression': 'to_string("left" +500)+\'_\'+to_string("bottom"+500)', 
-                                     'length': 25, 
-                                     'name': 'ID', 
-                                     'precision': 0, 
-                                     'type': 10}, 
-                                 {'expression': 'left+500',
-                                     'length': 24, 
-                                     'name': 'x', 
-                                     'precision': 0, 
-                                     'type': 2}, 
-                                 {'expression': 'bottom+500', 
-                                     'length': 24, 
-                                     'name': 'y', 
-                                     'precision': 0, 
-                                     'type': 2}],
-                             'OUTPUT':'memory:'},
-                             feedback=None)
-                
-            
-            filepath = sortieLissage
-            with open(filepath) as fp:
-                line = fp.readline()
-            fp.close()
-            
-            varList2 = line.replace('"',"").split(',')[3:-1] 
-            
-            result = processing.run("native:joinattributestable", 
-                    {'INPUT':result2['OUTPUT'],
-                     'FIELD':'ID',
-                     'INPUT_2':sortieLissage,
-                     'FIELD_2':'ID',
-                     'FIELDS_TO_COPY':varList2,
-                     'METHOD':1,'DISCARD_NONMATCHING':True,
-                     'PREFIX':'',
-                     'OUTPUT':'memory:'})
+            result = processing.run("native:fixgeometries", 
+                                    {'INPUT':sortieLissage,
+                                    'OUTPUT':'memory:'})
 
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT,
                     context, result['OUTPUT'].fields(), QgsWkbTypes.Polygon, result['OUTPUT'].sourceCrs())
@@ -608,7 +536,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         
         for feature in features:
             sink.addFeature(feature, QgsFeatureSink.FastInsert) 
-        shutil.rmtree(dirpath)
+        # shutil.rmtree(dirpath)
         
         return {self.OUTPUT: dest_id}
 
@@ -627,14 +555,14 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('Lissage BTB (Beyond the Border)')
+        return self.tr('BTB smoothing algorithm (with R + btb package)')
 
     def group(self):
         """
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Carroyage et lissage')
+        return self.tr('Grids and smoothing')
 
     def groupId(self):
         """
@@ -647,7 +575,7 @@ class SmoothToGridAlgorithm(QgsProcessingAlgorithm):
         return 'smoothing'
 
     def tr(self, string):
-        return QCoreApplication.translate('Processing', string)
+        return QCoreApplication.translate('SmoothToGridAlgorithm', string)
 
     def createInstance(self):
         return SmoothToGridAlgorithm()
@@ -690,12 +618,12 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr('Fond en entrée'),
+                self.tr('Input polygon layer'),
                 [QgsProcessing.TypeVectorPolygon]
             )
         )
         
-        self.extentList = [ 'Métropole - ETRS-LAEA - EPSG:3035', 
+        self.extentList = [ 'France métropolitaine / Europe - ETRS-LAEA - EPSG:3035', 
                             'Guadeloupe et Martinique - UTM 20N - EPSG:5490',
                             'La Réunion - UTM 40S - EPSG:2975', 
                             'Guyane - UTM 22N - EPSG:2972', 
@@ -704,7 +632,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterEnum(
                 self.EXTENT,
-                self.tr('Localisation'),
+                self.tr('Location'),
                 options=self.extentList
             )
         )
@@ -712,7 +640,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.CELL_SIZE,
-                self.tr('Maille du carreau (en mètres)'),
+                self.tr('Cell size (in meters)'),
                 defaultValue=1000,
                 minValue=1,
                 optional=False
@@ -726,7 +654,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                self.tr("Grille Inspire"), 
+                self.tr("Inspire grid output layer"), 
                 type=QgsProcessing.TypeVectorPolygon
             )
         )
@@ -750,10 +678,10 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         crsCode = crsList[extentZone]
         feedback.pushInfo('____________________')
         feedback.pushInfo('')
-        feedback.pushInfo(self.tr("Création d'une grille Inspire"))
+        feedback.pushInfo(self.tr("Generate an Inspire grid"))
         feedback.pushInfo('')    
-        feedback.pushInfo(self.tr('     • Contour : {0}'.format(source.sourceName())))
-        feedback.pushInfo(self.tr('     • Maille : {0} m'.format(CELL_SIZE)))
+        feedback.pushInfo('     • {0} : {1}'.format(self.tr('From the polygon layer'),source.sourceName()))
+        feedback.pushInfo('     • {0} : {1} m'.format(self.tr('Cell size'),CELL_SIZE))
         
         temp1 = processing.run("native:reprojectlayer", 
                     {'INPUT':source2,
@@ -773,13 +701,13 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         # layerExtentList = [xmin,xmax,ymin,ymax]
         layerExtent = "{0},{1},{2},{3}".format(xmin,xmax,ymin,ymax)
         
-        feedback.pushInfo(self.tr('     • Étendue de la couche : {0}'.format(layerExtent)))
-        feedback.pushInfo(self.tr("     • Zone EPSG : {0}".format(crsCode)))
+        feedback.pushInfo('     • '+self.tr('Layer extent')+' : {0}'.format(layerExtent))
+        feedback.pushInfo('     • '+self.tr('EPSG zone')+' : {0}'.format(crsCode))
         feedback.pushInfo('')
 
         
         # Creation de la grille
-        feedback.pushDebugInfo(self.tr("Création de la grille..."))
+        feedback.pushDebugInfo(self.tr("Generating an Inspire grid..."))
         grille = processing.run("qgis:creategrid", 
                         {'TYPE':2,
                          'EXTENT':layerExtent,
@@ -793,7 +721,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
 
 
         # Selection des carreaux utiles
-        feedback.pushDebugInfo(self.tr("Nettoyage de la grille..."))
+        feedback.pushDebugInfo(self.tr("Grid cleaning..."))
         processing.run("native:selectbylocation", 
                         {'INPUT':grille['OUTPUT'],
                          'PREDICATE':[0],
@@ -811,7 +739,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         refactorfieldsExpression_1k = "'CRS" + crsCode + "RES"+ str('1000') + "mN'" + ' + to_string(1000*to_int(floor("bottom"/1000))) + ' + "'E'" + ' + to_string(1000*to_int(floor("left"/1000)))' 
         
         # Ajout des colonnes ID, x et y
-        feedback.pushDebugInfo(self.tr("Ajout des identifiants Inspire..."))
+        feedback.pushDebugInfo(self.tr("Add Inspire ID..."))
         result2 = processing.run("qgis:refactorfields", 
                         {'INPUT':result1['OUTPUT'],
                              'FIELDS_MAPPING':[
@@ -828,7 +756,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
                                  'OUTPUT':'memory:'},
                                  feedback=feedback)
                                  
-        feedback.pushDebugInfo(self.tr("Chargement de la grille..."))
+        feedback.pushDebugInfo(self.tr("Grid loading..."))
         feedback.pushInfo('')
         
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT, context,
@@ -855,14 +783,14 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr("Générer une grille Inspire à partir d'un contour")
+        return self.tr("Create an Inspire grid from a polygon layer")
 
     def group(self):
         """
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Carroyage et lissage')
+        return self.tr('Grids and smoothing')
 
     def groupId(self):
         """
@@ -875,7 +803,7 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
         return 'smoothing'
 
     def tr(self, string):
-        return QCoreApplication.translate('Processing', string)
+        return QCoreApplication.translate('CreateInspireGridAlgorithm', string)
 
     def createInstance(self):
         return CreateInspireGridAlgorithm()
@@ -918,7 +846,7 @@ class DissolveAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.CELL_SIZE,
-                self.tr('Maille du carreau de la grille lissée (en mètres)'),
+                self.tr('Smoothed grid cell size (in meters)'),
                 defaultValue=1000,
                 minValue=1,
                 optional=False
@@ -928,7 +856,7 @@ class DissolveAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr("Contour du territoire lissé"),
+                self.tr("Contour of the smoothed zone"),
                 [QgsProcessing.TypeVectorPolygon],
                 optional = True
             )
@@ -940,7 +868,7 @@ class DissolveAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                self.tr("Carreaux regroupés"), 
+                self.tr("grouped cells layer"), 
                 type=QgsProcessing.TypeVectorPolygon
             )
         )
@@ -961,7 +889,7 @@ class DissolveAlgorithm(QgsProcessingAlgorithm):
                 raise NameError("InputError")
             except:
                 feedback.pushInfo(" ")
-                feedback.reportError("     • Pas de discrétisation trouvée !…")
+                feedback.reportError("     • {0} !…".format(self.tr("Layer not catogorised")))
                 feedback.pushInfo(" ")
                 raise
         else:        
@@ -981,20 +909,20 @@ class DissolveAlgorithm(QgsProcessingAlgorithm):
             layerExtent = "{0},{1},{2},{3} [{4}]".format(xmin,xmax,ymin,ymax,crs)
             feedback.pushInfo('____________________')
             feedback.pushInfo('')
-            feedback.pushInfo(self.tr("Regroupement des carreaux après lissage BTB"))
+            feedback.pushInfo(self.tr("Cell grouping after btb smoothing"))
             feedback.pushInfo('')    
-            feedback.pushInfo(self.tr('     • Grille lissée : {0}'.format(source.sourceName())))
-            feedback.pushInfo(self.tr('     • Maille : {0} m'.format(CELL_SIZE)))
-            feedback.pushInfo(self.tr('     • Étendue de la couche : {0}'.format(layerExtent)))
-            feedback.pushInfo(self.tr('     • SCR : {0}'.format(crs)))
+            feedback.pushInfo('     • {0} : {1}'.format(self.tr("Smoothed grid"),source.sourceName()))
+            feedback.pushInfo('     • {0} : {1} m'.format(self.tr("Cell size"),CELL_SIZE))
+            feedback.pushInfo('     • {0} : {1}'.format(self.tr("Layer extent"),layerExtent))
+            feedback.pushInfo('     • {0} : {1}'.format(self.tr("CRS"),crs))
             
             # 
             variable = source.renderer().classAttribute()
-            feedback.pushInfo(self.tr('     • variable : {0}'.format(variable)))
+            feedback.pushInfo('     • {0} : {1}'.format(self.tr("Value"),variable))
 
 
         
-            feedback.pushInfo(self.tr('     • type : {0}'.format(type)))
+            feedback.pushInfo('     • {0} : {1}'.format(self.tr("Type"),type))
             
             formula = 'CASE '
             i = 1
@@ -1132,14 +1060,14 @@ class DissolveAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr("Regrouper les carreaux de même classe après lissage")
+        return self.tr("Cell grouping after btb smoothing")
 
     def group(self):
         """
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Carroyage et lissage')
+        return self.tr('Grids and flows')
 
     def groupId(self):
         """
@@ -1152,7 +1080,7 @@ class DissolveAlgorithm(QgsProcessingAlgorithm):
         return 'smoothing'
 
     def tr(self, string):
-        return QCoreApplication.translate('Processing', string)
+        return QCoreApplication.translate('DissolveAlgorithm', string)
 
     def createInstance(self):
         return DissolveAlgorithm()

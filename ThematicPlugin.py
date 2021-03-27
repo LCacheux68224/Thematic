@@ -34,8 +34,12 @@ import os
 import sys
 import inspect
 
+
 from qgis.core import QgsProcessingAlgorithm, QgsApplication
 from .ThematicProvider import ThematicProvider
+
+from qgis.core import  QgsColorScheme, QgsStyle
+from PyQt5.QtGui import  QColor
 
 cmd_folder = os.path.split(inspect.getfile(inspect.currentframe()))[0]
 
@@ -62,3 +66,163 @@ class ThematicPlugin(object):
 
     def unload(self):
         QgsApplication.processingRegistry().removeProvider(self.provider)
+
+from qgis.core import *
+from qgis.gui import *
+import re
+
+@qgsfunction(args=2, group='Thematic')
+def retour_ligne(values, feature, parent):
+    """
+        Retour &agrave; la ligne automatique
+        
+        <h4>Syntaxe</h4>
+        <p> retour_ligne(<i>LibGeo, NbCaract&egrave;res</i>)</p>
+
+        <h4>Arguments</h4>
+        <p><i>  LibGeo</i> &rarr; Libell&eacute; g&eacute;ographique &agrave; afficher</p>
+        <p><i>  NbCaract&egrave;res</i> &rarr; Nombre de caract&egrave;res minimum avant retour &agrave; la ligne</p>
+        
+        <h4>Exemple</h4>
+        <p><!-- Show example of function.-->
+        retour_ligne(LIBGEO,5) </p>
+    """
+    result0 = re.sub('(.{'+str(values[1])+'}[^-]*)-','\\1-\n',values[0])
+    result1 = re.sub('(.{'+str(values[1])+'}[^\\s.]*)\\s','\\1\n',result0)
+    return result1
+
+@qgsfunction(3,group='Thematic')
+def  tcam(values, feature, parent):
+    """
+        Taux de croissance annuel moyen (en %)
+        
+        <h4>Syntaxe</h4>
+        <p> tcam(<i>Annee1, Annee2, NbAnnees</i>)</p>
+
+        <h4>Arguments</h4>
+        <p><i>  Annee1</i> &rarr; Ann&eacute;e de d&eacute;part
+        <p><i>  Annee2</i> &rarr; Ann&eacute;e d'arriv&eacute;e
+        <p><i>  NbAnnees</i> &rarr; Nombre d'ann&eacute;es<br></p>
+        <p>Le taux de croissance annuel moyen n'est pas calcul&eacute; en cas de valeur manquante<br></p>
+        
+        <h4>Exemple</h4>
+        <p><!-- Show example of function.-->
+              tcam(POP2006, PO2011,5) </p>
+    """  
+    try: # si une erreur est detectee dans le bloc "try", c'est le bloc "except" qui s'execute (traitement des exceptions)
+        annee1 = float(values[0]) # pour passer un nombre entier en nombre a virgule flottante
+        annee2 = float(values[1])
+        NbAnnees = values[2]
+        return ((annee2/annee1)**(1.0/NbAnnees)-1)*100
+    except:
+        return None
+
+@qgsfunction(args=2, group='Thematic')
+def discontinuite_relative(values, feature, parent):
+    """
+        Discontinuit&eacute; relative entre deux variables
+        <p>==>  max( var1 , var2 ) / min( var1 , var2 )</p>
+
+        <h4>Syntaxe</h4>
+        <p> discontinuite_relative(<i>variable1,variable2</i>)</p>
+
+        <h4>Arguments</h4>
+        <p><i>  variable1, variable2</i> &rarr; variables &agrave; comparer</p>
+        
+        <h4>Exemple</h4>
+        <p><!-- Show example of function.-->
+        discontinuite_relative("VAR1","VAR2") </p>
+    """
+    return max(float(values[0]),float(values[1]))/min(float(values[0]),float(values[1]))
+
+@qgsfunction(args=2, group='Thematic')
+def discontinuite_absolue(values, feature, parent):
+    """
+        Discontinuit&eacute; absolue entre deux variables
+        <p>==>  max( var1 , var2 ) - min( var1 , var2 )</p>
+
+        <h4>Syntaxe</h4>
+        <p> discontinuite_absolue(<i>variable1,variable2</i>)</p>
+
+        <h4>Arguments</h4>
+        <p><i>  variable1, variable2</i> &rarr; variables &agrave; comparer</p>
+        
+        <h4>Exemple</h4>
+        <p><!-- Show example of function.-->
+        discontinuite_absolue("VAR1","VAR2") </p>
+    """
+    return max(values[0],values[1]) - min(values[0],values[1])
+
+@qgsfunction(2,group='Thematic')
+def discontRelative(values, feature, parent):
+    """
+        Discontinuit&eacute; relative entre deux variables
+        <p>==>  max( var1 , var2 ) / min( var1 , var2 )</p>
+
+        <h4>Syntaxe</h4>
+        <p> discontRelative(<i>variable1,variable2</i>)</p>
+
+        <h4>Arguments</h4>
+        <p><i>  variable1, variable2</i> &rarr; variables &agrave; comparer</p>
+        
+        <h4>Exemple</h4>
+        <p><!-- Show example of function.-->
+        discontRelative("VAR1","VAR2") </p>
+    """
+    return max(float(values[0]),float(values[1]))/min(float(values[0]),float(values[1]))
+
+@qgsfunction(2,group='Thematic')
+def discontAbsolue(values, feature, parent):
+    """
+        Discontinuit&eacute; absolue entre deux variables
+        <p>==>  max( var1 , var2 ) - min( var1 , var2 )</p>
+
+        <h4>Syntaxe</h4>
+        <p> discontAbsolue(<i>variable1,variable2</i>)</p>
+
+        <h4>Arguments</h4>
+        <p><i>  variable1, variable2</i> &rarr; variables &agrave; comparer</p>
+        
+        <h4>Exemple</h4>
+        <p><!-- Show example of function.-->
+        discontAbsolue("VAR1","VAR2") </p>
+    """
+    return max(values[0],values[1]) - min(values[0],values[1])
+    
+@qgsfunction(1,group='Thematic')
+def extraire_libgeo(values, feature, parent):
+    """
+        Extraire un libell&eacute; g&eacute;ographique d'une chaine de caract&egrave;res de type de type Corse-du-Sud (2A)
+
+        <h4>Syntaxe</h4>
+        <p> extraire_libgeo(<i>ChaineCaractere</i>)</p>
+
+        <h4>Arguments</h4>
+        <p><i>  ChaineCaractere</i> &rarr; Chaine de caract&egrave;res contenant un libell&eacute; g&eacute;ographique + un code g&eacute;ographique entre parenth&egrave;ses</p>
+        
+        <h4>Exemple</h4>
+        <p><!-- Show example of function.-->
+        extraire_libgeo(DEP) </p>
+    """
+    return re.search('(.+)\s\(',values[0]).group(1)
+    
+@qgsfunction(1, group='Thematic')
+def hexa_to_rgba(values, feature, parent):
+    """
+        Transforme une couleur Hexa en rgba.
+        
+        <h4>Syntax</h4>
+        <p>hexa_to_rgba(<i>couleur</i>)</p>
+
+        <h4>Arguments</h4>
+        <p><i>couleur</i> &rarr; couleur au format #abcdef.<br></p>
+        
+        <h4>Exemple</h4>
+        <p><!-- Show example of function.-->
+             hexa_to_rgb('#ffffff') &rarr; '255.255.255.255'</p>
+    """  
+    value = values[0].lstrip('#')
+    lv = len(value)
+    rgba = str(tuple(int(value[i:int(i+lv/3)], 16) for i in range(0, lv, int(lv/3)))).strip('()')+',255'
+    return rgba
+

@@ -1,0 +1,13 @@
+
+SET OSGEO4W_ROOT=C:\PROGRA~1\QGIS 3.10
+path %PATH%;%OSGEO4W_ROOT%\apps\Qt5\bin
+path %PATH%;%OSGEO4W_ROOT%\apps\Python37\Scripts
+
+set PYTHONPATH=%PYTHONPATH%;%OSGEO4W_ROOT%\apps\qgis\python
+set PYTHONHOME=%OSGEO4W_ROOT%\apps\Python37
+
+
+
+lancer pyludpate5 -noobsolete photo_linker.pro
+
+/!\ remplacer le chemine de pylupdate5 vers python par python3 sans rien avant
