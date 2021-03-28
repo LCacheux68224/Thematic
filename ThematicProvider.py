@@ -56,6 +56,9 @@ from .FlowsAlgorithms import CreateSaphirArrowsAlgorithm
 from .FlowsAlgorithms import CreateCustomSaphirArrowsAlgorithm
 from .FlowsAlgorithms import CreateArrowsLegendAlgorithm
 
+from .DiscontinuitiesMapAlgorithms import GetInnerBordersAlgorithm
+from .DiscontinuitiesMapAlgorithms import RelativeDiscontinuitiesAlgorithm
+
 class ThematicProvider(QgsProcessingProvider):
 
     def __init__(self):
@@ -115,7 +118,10 @@ class ThematicProvider(QgsProcessingProvider):
                    CreateCustomArrowsAlgorithm(),
                    CreateSaphirArrowsAlgorithm(),
                    CreateCustomSaphirArrowsAlgorithm(),
-                   CreateArrowsLegendAlgorithm()]
+                   CreateArrowsLegendAlgorithm(),
+                   GetInnerBordersAlgorithm(),
+                   RelativeDiscontinuitiesAlgorithm()
+                   ]
                        
         for elem in alglist:
             self.addAlgorithm(elem)
