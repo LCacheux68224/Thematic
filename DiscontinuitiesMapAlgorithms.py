@@ -235,7 +235,7 @@ class GetInnerBordersAlgorithm(QgsProcessingAlgorithm):
         return 'discontinuities'
 
     def tr(self, string):
-        return QCoreApplication.translate('GetBordersAlgorithmAlgorithm', string)
+        return QCoreApplication.translate('GetInnerBordersAlgorithm', string)
 
     def createInstance(self):
         return GetInnerBordersAlgorithm()

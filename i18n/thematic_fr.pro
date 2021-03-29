@@ -3,6 +3,6 @@ SOURCES = ../ThematicPlugin.py \
 ../SymbolsAlgorithms.py \
 ../FlowsAlgorithms.py \
 ../SmoothingAlgorithms.py \
-
+../DiscontinuitiesMapAlgorithms.py
 
 TRANSLATIONS = thematic_fr.ts
