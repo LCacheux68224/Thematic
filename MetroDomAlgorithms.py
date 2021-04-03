@@ -347,7 +347,17 @@ class RapprocheDepAlgorithm(QgsProcessingAlgorithm):
 
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/metrodom.png')
-
+        
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/metroDom.svg'></center> \
+           <p> Permet de rapprocher la Corse ainsi que les départements et régions d’outre-mer du continent.</p>\
+           <p> <b>Les fonds de carte sélectionnés doivent être compatibles entre eux (type de géométrie et attributs)<\b></p>\
+           <p> Le résultat comprendra l’ensemble des territoires choisis dans un fond de carte unique utilisant le système de projection Lambert 93.</p>".format(os.path.dirname(__file__))) 
 
 class ZoomParisAlgorithm(QgsProcessingAlgorithm):
     """
@@ -408,7 +418,7 @@ class ZoomParisAlgorithm(QgsProcessingAlgorithm):
         """
 
         feedback.pushInfo(" ")
-        feedback.pushInfo("Zoom sur Paris et son entourrage")
+        feedback.pushInfo("Zoom sur Paris et son entourage")
 
         metropole = self.parameterAsSource(parameters, self.METROPOLE, context).materialize(QgsFeatureRequest())
         analysisLayer =  self.parameterAsSource(parameters, self.METROPOLE, context)
@@ -472,7 +482,7 @@ class ZoomParisAlgorithm(QgsProcessingAlgorithm):
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('Zoom sur Paris et son entourrage')
+        return self.tr('Zoom sur Paris et son entourage')
 
     def group(self):
         """
@@ -499,3 +509,14 @@ class ZoomParisAlgorithm(QgsProcessingAlgorithm):
 
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/zoomParis.png')
+        
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/zoomParis.svg' ></center> \
+           <p> Permet d’extraire un zoom centré sur Paris et ses départements limitrophes.</p>\
+           <p> <b>Le fond de carte en entrée doit utiliser le système de projection Lambert 93.<\b></p>".format(os.path.dirname(__file__))) 
+          
