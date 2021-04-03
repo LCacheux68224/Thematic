@@ -59,6 +59,9 @@ from .FlowsAlgorithms import CreateArrowsLegendAlgorithm
 from .DiscontinuitiesMapAlgorithms import GetInnerBordersAlgorithm
 from .DiscontinuitiesMapAlgorithms import RelativeDiscontinuitiesAlgorithm
 
+from .MetroDomAlgorithms import RapprocheDepAlgorithm
+from .MetroDomAlgorithms import ZoomParisAlgorithm
+
 class ThematicProvider(QgsProcessingProvider):
 
     def __init__(self):
@@ -120,7 +123,9 @@ class ThematicProvider(QgsProcessingProvider):
                    CreateCustomSaphirArrowsAlgorithm(),
                    CreateArrowsLegendAlgorithm(),
                    GetInnerBordersAlgorithm(),
-                   RelativeDiscontinuitiesAlgorithm()
+                   RelativeDiscontinuitiesAlgorithm(),
+                   RapprocheDepAlgorithm(),
+                   ZoomParisAlgorithm()
                    ]
                        
         for elem in alglist:

@@ -10,7 +10,7 @@
 name=Thematic
 qgisMinimumVersion=3.0
 description=Thematic cartography tools for processing
-version=0.2.29
+version=0.2.30
 author=Lionel Cacheux
 email=lionel.cacheux@gmx.fr
 
