@@ -243,6 +243,17 @@ class GetInnerBordersAlgorithm(QgsProcessingAlgorithm):
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/innerBorders.png')
 
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/helper/frontieresInterieures_h.png' ></center> \
+           <p> Génère  un fond de lignes de contigüités entre les zones composant le <b>fond en entrée</b><p>\
+           <p>L’<b>identifiant géographique</b> permettra d’indiquer à quelles zones chaque segment est commun. </p>\
+           <p>Pour ne pas tenir compte des enclaves il est possible de <b>supprimer les trous</b>  </p>".format(os.path.dirname(__file__))) 
+           
 
 class RelativeDiscontinuitiesAlgorithm(QgsProcessingAlgorithm):
     """
@@ -444,3 +455,16 @@ class RelativeDiscontinuitiesAlgorithm(QgsProcessingAlgorithm):
 
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/discontinuities.png')
+        
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/helper/discont_h.png' ></center> \
+           <p> Génère  une carte de discontinuité relative à partir d’un <b>fond en entrée</b><p>\
+           <p>L’<b>identifiant géographique</b> permettra d’indiquer à quelles zones chaque segment est commun. </p>\
+           <p>La <b>variable à représenter</b> sera utilisée pour le calcul de la discontinuite relative (rapport max(A,B) / min(A,B)). <p>\
+           <p>Cette représentation permet de compléter une carte de ratio en mettant  en évidence les ruptures spatiales</p>".format(os.path.dirname(__file__))) 
+           

@@ -354,7 +354,7 @@ class RapprocheDepAlgorithm(QgsProcessingAlgorithm):
         should provide a basic description about what the algorithm does and the
         parameters and outputs associated with it..
         """
-        return self.tr("<center><img src='{0}/images/metroDom.svg'></center> \
+        return self.tr("<center><img src='{0}/images/helper/metroDom_h.png'></center> \
            <p> Permet de rapprocher la Corse ainsi que les départements et régions d’outre-mer du continent.</p>\
            <p> <b>Les fonds de carte sélectionnés doivent être compatibles entre eux (type de géométrie et attributs)<\b></p>\
            <p> Le résultat comprendra l’ensemble des territoires choisis dans un fond de carte unique utilisant le système de projection Lambert 93.</p>".format(os.path.dirname(__file__))) 
@@ -516,7 +516,7 @@ class ZoomParisAlgorithm(QgsProcessingAlgorithm):
         should provide a basic description about what the algorithm does and the
         parameters and outputs associated with it..
         """
-        return self.tr("<center><img src='{0}/images/zoomParis.svg' ></center> \
+        return self.tr("<center><img src='{0}/images/helper/zoomParis_h.png' ></center> \
            <p> Permet d’extraire un zoom centré sur Paris et ses départements limitrophes.</p>\
            <p> <b>Le fond de carte en entrée doit utiliser le système de projection Lambert 93.<\b></p>".format(os.path.dirname(__file__))) 
           

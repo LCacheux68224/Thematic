@@ -503,7 +503,17 @@ class CreateAutomaticSymbolsAlgorithm(QgsProcessingAlgorithm):
         should provide a basic description about what the algorithm does and the
         parameters and outputs associated with it..
         """
-        return self.tr("Description html")    
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/helper/ronds_h.png' ></center> \
+           <p> Génère  une carte de symboles proportionnels à partir de <b>valeurs à représenter </b> contenues dans la table des attributs d’un <b>fond en entrée</b><p>\
+           <p>Le choix du <b>type de représentation</b>  se fait entre les cercles, losanges et carrés</p>\
+           <p>Le <b>contour de référence</b> sert au calcul de l’échelle des symboles proportionnels.<p>\
+           <p>Par défaut l’algorithme va <b>générer une  légende<b></p>".format(os.path.dirname(__file__))) 
 
 # ---------------------------- #
 # Create custom symbols layer  #
@@ -916,7 +926,11 @@ class CreateCustomSymbolsAlgorithm(QgsProcessingAlgorithm):
         should provide a basic description about what the algorithm does and the
         parameters and outputs associated with it..
         """
-        return self.tr("Description html") 
+        return self.tr("<center><img src='{0}/images/helper/ronds_h.png' ></center> \
+           <p> Génère  une carte de symboles proportionnels à partir de <b>valeurs à représenter </b> contenues dans la table des attributs d’un <b>fond en entrée</b><p>\
+           <p>Le choix du <b>type de représentation</b>  se fait entre les cercles, losanges et carrés</p>\
+           <p>L’échelle des symboles proportionnels est calculée en fonction de la <b>valeur maximale</b> associée à <b>largeur de symbole associée</b>, toutes deux renseignées par l’utilisateur.<p>\
+           <p>Par défaut l’algorithme va <b>générer une  légende<b></p>".format(os.path.dirname(__file__))) 
 
 # ---------------------------- #
 # Create circles legend #
@@ -1234,6 +1248,18 @@ class CreateSymbolsLegendAlgorithm(QgsProcessingAlgorithm):
 
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/iconRondsLegende2.png')
+        
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/helper/ronds_legende_h.png' ></center> \
+           <p> Génère  une légende de symboles proportionnels</b><p>\
+           <p>Le choix du <b>type de représentation</b>  se fait entre les cercles, losanges et carrés</p>\
+           <p>L’échelle des symboles proportionnels est définie par la <b>valeur maximale</b>  et sa <b>largeur associée </b><p>\
+           <p>Par défaut les valeurs représentées correspondent à la valeur maximale renseignée, son tier et son neuvième. Il est possible d’imposer les <b>valeurs à représenter dans la légende</b> manuellement.<b></p>".format(os.path.dirname(__file__))) 
 
 class FormatProportionalSymbolsLegendAlgorithm(QgsProcessingAlgorithm):
     """
@@ -1356,4 +1382,6 @@ class FormatProportionalSymbolsLegendAlgorithm(QgsProcessingAlgorithm):
         should provide a basic description about what the algorithm does and the
         parameters and outputs associated with it..
         """
-        return self.tr("Description html") 
+        return self.tr("<center><img src='{0}/images/helper/ronds_legende_h.png' ></center> \
+           <p> Applique la symbologie correspondante à un <b>fond de légende</b></p>\
+           <p>Le choix du <b>type de représentation</b>  se fait entre les cercles, losanges et carrés</p>".format(os.path.dirname(__file__)))  

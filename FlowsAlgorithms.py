@@ -368,7 +368,18 @@ class CreateLinesAlgorithm(QgsProcessingAlgorithm):
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/oursins.png')
         
-
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/helper/oursins_h.png' ></center> \
+           <p> Génère  un fond d’oursins représentant les liens ou les flux entre deux points de la carte sans tenir compte de leur intensité<p>\
+           <p> La <b>table de flux</b> doit contenir l’<b>origine</b>, la <b>destination</b> et la valeur de chaque <b>flux </b>à représenter</p> \
+           <p>Le <b>fond de géolocalisation</b> sert à obtenir les coordonnées de l’origine et de la destination de chaque flux à partir de l’<b>identifiant code géographique</b><p>\
+           <p><b>Les paramètres avancés </b>permettent de  filtrer les flux selon leur intensité (<b>flux minimum</b>) et  une <b>distance maximale</b> <p>".format(os.path.dirname(__file__)))            
+           
 class ShortenLinesAlgorithm(QgsProcessingAlgorithm):
     """
     This is an example algorithm that takes a vector layer and
@@ -1025,7 +1036,21 @@ class CreateArrowsAlgorithm(QgsProcessingAlgorithm):
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/fleches.png')
         
-        
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/helper/fleches0_h.png' ></center> \
+           <p> Génère des flèches représentant des flux selon une échelle calculée en fonction de l’emprise du territoire étudié. </p>\
+           <p> La <b>table de flux</b> doit contenir l’<b>origine</b>, la <b>destination</b> et la valeur de chaque <b>flux </b>à représenter</p> \
+           <p>Le <b>fond de géolocalisation</b> sert à obtenir les coordonnées de l’origine et de la destination de chaque flux à partir de l’<b>identifiant code géographique</b><p>\
+           <b>Les flèches réduites</b> sont retaillées en fonction de la forme des polygones du fond de géolocalisation. Dans le cas contraire, les flèches joignent les centroïdes de ces polygones.</p>\
+           <p>Par défaut l’algorithme va <b>générer une légende</b></p>\
+           <p><b>Les paramètres avancés </b>permettent de  filtrer les flux selon leur intensité (<b>flux minimum</b>) et  une <b>distance maximale</b> <p>".format(os.path.dirname(__file__))) 
+           
+           
 class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
     """
     This is an example algorithm that takes a vector layer and
@@ -1529,6 +1554,20 @@ class CreateCustomArrowsAlgorithm(QgsProcessingAlgorithm):
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/fleches2.png')
         
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/helper/fleches0_h.png' ></center> \
+           <p> Génère des flèches de flux selon la même méthode que les <b>flèches joignantes avec échelle automatique</b>, mais en imposant une échelle personnalisée associant une <b>valeur maximale</b> à une <b>largeur associée</b></p>\
+           <p> La <b>table de flux</b> doit contenir l’<b>origine</b>, la <b>destination</b> et la valeur de chaque <b>flux </b>à représenter</p> \
+           <p>Le <b>fond de géolocalisation</b> sert à obtenir les coordonnées de l’origine et de la destination de chaque flux à partir de l’<b>identifiant code géographique</b><p>\
+           <b>Les flèches réduites</b> sont retaillées en fonction de la forme des polygones du fond de géolocalisation. Dans le cas contraire, les flèches joignent les centroïdes de ces polygones.</p>\
+           <p>Par défaut l’algorithme va <b>générer une légende</b></p>\
+           <p><b>Les paramètres avancés </b>permettent de  filtrer les flux selon leur intensité (<b>flux minimum</b>) et une <b>distance maximale</b> <p>".format(os.path.dirname(__file__))) 
+        
 class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
     """
     This is an example algorithm that takes a vector layer and
@@ -1947,7 +1986,19 @@ class CreateSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/saphir.png')
 
-
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/helper/fleches2_h.png' ></center> \
+           <p> Génère des flèches courtes indiquant la direction et le volume des flux depuis ou vers un territoire de référence . L’échelle  est calculée  en fonction de l’emprise de l’ensemble des flux. </p>\
+           <p> La <b>table de flux</b> doit contenir l’<b>origine</b>, la <b>destination</b> et la valeur de chaque <b>flux </b>à représenter</p> \
+           <p>Le <b>fond de géolocalisation</b> sert à obtenir les coordonnées de l’origine et de la destination de chaque flux à partir de l’<b>identifiant code géographique</b><p>\
+           <p>Par défaut l’algorithme va <b>générer une légende</b></p>\
+           <p><b>Les paramètres avancés </b>permettent de  filtrer les flux selon leur intensité (<b>flux minimum</b>) et une <b>distance maximale</b> <p>".format(os.path.dirname(__file__))) 
+           
 class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
     """
     This is an example algorithm that takes a vector layer and
@@ -2428,7 +2479,19 @@ class CreateCustomSaphirArrowsAlgorithm(QgsProcessingAlgorithm):
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/saphir2.png')
         
-
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/helper/fleches2_h.png' ></center> \
+           <p> Génère des flèches courtes indiquant la direction et le volume des flux depuis ou vers un territoire de référence . L’échelle  est définie par l’utilisateur en associant une <b>valeur maximale</b> à une <b>largeur associée. </p>\
+           <p> La <b>table de flux</b> doit contenir l’<b>origine</b>, la <b>destination</b> et la valeur de chaque <b>flux </b>à représenter</p> \
+           <p>Le <b>fond de géolocalisation</b> sert à obtenir les coordonnées de l’origine et de la destination de chaque flux à partir de l’<b>identifiant code géographique</b><p>\
+           <p>Par défaut l’algorithme va <b>générer une légende</b></p>\
+           <p><b>Les paramètres avancés </b>permettent de  filtrer les flux selon leur intensité (<b>flux minimum</b>) et une <b>distance maximale</b> <p>".format(os.path.dirname(__file__))) 
+           
 class CreateArrowsLegendAlgorithm(QgsProcessingAlgorithm):
     """
     Gerenate a legend layer for proportional symbols
@@ -2692,3 +2755,15 @@ class CreateArrowsLegendAlgorithm(QgsProcessingAlgorithm):
 
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/fleches_leg.png')
+        
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/helper/fleches3_h.png' ></center> \
+           <p> Génère  une légende de flèches sous forme de fond de carte<p>\
+           <p>L’échelle  est définie par l’utilisateur en associant une <b>valeur maximale</b> à une <b>largeur associée. </p>\
+           <p>Deux flèches sont représentées par défaut correspondant à la valeur maximale ainsi que la moité de cette valeur. Il est possible de personnaliser la légende en modifiant les <b>valeurs à représenter dans la légende</b></p>".format(os.path.dirname(__file__))) 
+           

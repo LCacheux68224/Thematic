@@ -270,6 +270,16 @@ class CreateBtbGridAlgorithm(QgsProcessingAlgorithm):
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/grid0.png')
 
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/helper/grillebtb_h.png' ></center> \
+           <p> Génère une grille utilisable avec le package btb de R permettant de réaliser des lissages.</p>\
+           <p> Le <b>fond  entrée </b> délimite l’emprise de la grille à générer</p>\
+           <p> La <b>maille de carreaux</b> est définie par défaut à 1 000 mètres.".format(os.path.dirname(__file__))) 
 
 # ----------------------------- #
 # Smooth datas to a grid layer  #
@@ -811,7 +821,18 @@ class CreateInspireGridAlgorithm(QgsProcessingAlgorithm):
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/grid0.png')
     
-    
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/helper/grilleInspire_h.png' ></center> \
+           <p> Génère une grille compatible avec les données carroyées Eurostat et Insee.</p>\
+           <p>La <b>localisation</b> permettra de générer une grille dans la projection telle que définie dans la norme Insipire pour le carroyage (EPSG:3035 pour la partie continentale de l’Union Européenne)</p> \
+           <p> La <b>maille de carreaux</b> est définie par défaut à 1 000 mètres.".format(os.path.dirname(__file__))) 
+
+
 class DissolveAlgorithm(QgsProcessingAlgorithm):
     """
     This is an example algorithm that takes a vector layer and
@@ -1087,3 +1108,14 @@ class DissolveAlgorithm(QgsProcessingAlgorithm):
 
     def icon(self):
         return QIcon(os.path.dirname(__file__) + '/images/grid2.png')
+
+    def shortHelpString(self):
+        """
+        Returns a localised short helper string for the algorithm. This string
+        should provide a basic description about what the algorithm does and the
+        parameters and outputs associated with it..
+        """
+        return self.tr("<center><img src='{0}/images/helper/regroupement_lissage_h.png' ></center> \
+           <p> Regroupe les carreaux du fond  lissé actif en reprenant les classes affichées</p>\
+           <p>Indiquer la <b>maille de la grille lissée</p>\
+           <p><b>Le contour de lissage</b> permet de découper le bord du fond lissé selon le contour du territoire".format(os.path.dirname(__file__)))  
