@@ -33,13 +33,22 @@ __revision__ = '$Format:%H$'
 import os
 import sys
 import inspect
+import os.path
+from os import path
+import shutil
 
+from qgis.core import QgsProcessingAlgorithm, QgsApplication, QgsStyle, Qgis, QgsSettings
 
-from qgis.core import QgsProcessingAlgorithm, QgsApplication
+from qgis.PyQt.QtWidgets import *
+
 from .ThematicProvider import ThematicProvider
+from qgis.utils import iface
+from PyQt5.QtGui import QIcon
+from qgis.PyQt.QtCore import QSettings
 
-from qgis.core import  QgsColorScheme, QgsStyle
-from PyQt5.QtGui import  QColor
+
+from .palette_dialog import AddPaletteDialog
+from .remove_palette_dialog import RemovePaletteDialog
 
 cmd_folder = os.path.split(inspect.getfile(inspect.currentframe()))[0]
 
@@ -62,13 +71,148 @@ class ThematicPlugin(object):
     def initGui(self):
         # Ajout        
         """Init Processing provider for QGIS >= 3.8."""
-        self.initProcessing()       
+        
+        self.initProcessing()
+        
+        try:
+
+            if 'INSEE' in os.getenv('USERDNSDOMAIN'):
+
+                pluginPath = os.path.abspath(os.path.dirname(__file__))
+                images = pluginPath + os.sep + "images" + os.sep
+                self.pluginMenu = iface.settingsMenu().addMenu(QIcon(images + 'palette_2018.svg'), "Palette Insee 2018")
+
+                self.actionAdd = QAction(QIcon(images + 'palette_2018.svg'),
+                                          "Installer la palette", iface.mainWindow())
+                self.actionAdd.triggered.connect(self.runAddPalette)
+                self.first_start_actionAdd = True
+
+                self.actionRemove = QAction(QIcon(images + 'palette_2018_remove.svg'),
+                                          "Supprimer l'ancienne palette", iface.mainWindow())
+                self.actionRemove.triggered.connect(self.runRemovePalette)
+                self.first_start_actionRemove = True
+
+                # self.actionAide.triggered.connect(showHelp)
+                self.pluginMenu.addAction(self.actionAdd)
+                self.pluginMenu.addAction(self.actionRemove)
+        except:
+            pass
+
+        else:
+            pass
 
     def unload(self):
         QgsApplication.processingRegistry().removeProvider(self.provider)
+            
+        # if hasattr(self, 'actionEditor'):  iface.removeToolBarIcon(self.actionEditor)
+        try:
+            self.pluginMenu.parentWidget().removeAction(self.pluginMenu.menuAction())  # Remove from Extension menu
+            QgsApplication.processingRegistry().removeProvider(self.provider)
+        except:
+            pass
+
+    def runAddPalette(self):
+        """Run method that performs all the real work"""
+
+        # Create the dialog with elements (after translation) and keep reference
+        # Only create GUI ONCE in callback, so that it will only load when the plugin is started
+        if self.first_start_actionAdd == True:
+            self.first_start_actionAdd = False
+            self.dlgAdd = AddPaletteDialog()
+
+        # show the dialog
+        self.dlgAdd.show()
+        # Run the dialog event loop
+        result = self.dlgAdd.exec_()
+        # See if OK was pressed
+        if result:
+            # Do something useful here - delete the line containing pass and
+            # substitute with your code.
+            qstyles = QgsStyle.defaultStyle()
+
+            favoriteRamps = qstyles.symbolsOfFavorite(QgsStyle.StyleEntity.ColorrampEntity)
+            for i in favoriteRamps:
+                qstyles.removeFavorite(QgsStyle.StyleEntity.ColorrampEntity, i)
+
+            qstyles.importXml(os.path.abspath(os.path.dirname(__file__)) + '/palettes/symbology-style.xml')
+
+            listeGpl = os.listdir(os.path.abspath(os.path.dirname(__file__)) + '/palettes')
+            for item in listeGpl:
+                fichier = os.path.abspath(os.path.dirname(__file__)) + '/palettes/' + item
+                shutil.copy(fichier, re.sub('\\\\', '/', QgsApplication.qgisSettingsDirPath()) + '/palettes')
+
+
+                QgsApplication.qgisSettingsDirPath()
+
+            newFavorites = ['Insee-Bleu_2P', 'Insee-Bleu_3P', 'Insee-Bleu_4P', 'Insee-Bleu_5P', 'Insee-Bleu_6P', 'Insee-Jaune_1N1P', 'Insee-Jaune_1N2P', 'Insee-Jaune_1N3P', 'Insee-Jaune_1N4P', 'Insee-Jaune_1N5P', 'Insee-Jaune_2N1P', 'Insee-Jaune_2N2P', 'Insee-Jaune_2N3P', 'Insee-Jaune_2N4P', 'Insee-Jaune_3N1P', 'Insee-Jaune_3N2P', 'Insee-Jaune_3N3P', 'Insee-Jaune_4N1P', 'Insee-Jaune_4N2P', 'Insee-Jaune_5N1P']
+            for i in newFavorites:
+                qstyles.addFavorite(QgsStyle.StyleEntity.ColorrampEntity,i)
+
+            app = QgsApplication.instance()
+
+            params = QgsSettings(
+                app.qgisSettingsDirPath() + "QGIS/QGIS3.ini", QSettings.IniFormat
+            )
+
+            params.setValue('colors/showInMenuList', ['Insee2018 - Couleurs de base','Insee2018 Bleu—Jaune'])
+            for item in QgsApplication.colorSchemeRegistry().schemes():
+                QgsApplication.colorSchemeRegistry().removeColorScheme(item)
+
+            # QgsApplication.colorSchemeRegistry().addUserSchemes()
+            QgsApplication.colorSchemeRegistry().addDefaultSchemes()
+
+            iface.messageBar().pushMessage("Palette", "La palette de couleurs Insee a été installée", level=Qgis.Info)
+
+
+    def runRemovePalette(self):
+        """Run method that performs all the real work"""
+
+        # Create the dialog with elements (after translation) and keep reference
+        # Only create GUI ONCE in callback, so that it will only load when the plugin is started
+        if self.first_start_actionRemove == True:
+            self.first_start_actionRemove = False
+            self.dlgRemove = RemovePaletteDialog()
+
+        # show the dialog
+        self.dlgRemove.show()
+        # Run the dialog event loop
+        result = self.dlgRemove.exec_()
+        # See if OK was pressed
+        if result:
+            # Do something useful here - delete the line containing pass and
+            # substitute with your code.
+            style = QgsStyle.defaultStyle()
+
+            listeTagsSymbols = ['Contours', 'Analyses', 'Dossier', 'Flash', 'IP', 'Insee']
+            # listeIdTagsSymbols = [style.tagId(n) for n in listeTagsSymbols]
+            for symbolIdTag in [style.tagId(n) for n in listeTagsSymbols]:
+                for i in style.symbolsWithTag(QgsStyle.StyleEntity.SymbolEntity, symbolIdTag):
+                    style.removeSymbol(i)
+
+            listeTagsRamps = ['Analyses_deg', 'Dossier_deg', 'Flash_deg', 'IP_deg']
+            # listeIdTagsRamps = [style.tagId(n) for n in listeTagsRamps]
+            for rampIdTag in [style.tagId(n) for n in listeTagsRamps]:
+                for i in style.symbolsWithTag(QgsStyle.StyleEntity.ColorrampEntity, rampIdTag):
+                    style.removeColorRamp(i)
+
+            app = QgsApplication.instance()
+            params = QgsSettings(
+                app.qgisSettingsDirPath() + "QGIS/QGIS3.ini", QSettings.IniFormat
+            )
+
+            params.remove('colors')
+            params.setValue('colors/showInMenuList', ['Insee2018 - Couleurs de base','Insee2018 Bleu—Jaune'])
+            for item in QgsApplication.colorSchemeRegistry().schemes():
+                QgsApplication.colorSchemeRegistry().removeColorScheme(item)
+
+            # QgsApplication.colorSchemeRegistry().addUserSchemes()
+            QgsApplication.colorSchemeRegistry().addDefaultSchemes()
+
+            iface.messageBar().pushMessage("Palette", "L'ancienne palette a été effacée", level=Qgis.Info)
+
 
 from qgis.core import *
-from qgis.gui import *
+# from qgis.gui import *
 import re
 
 @qgsfunction(args=2, group='Thematic')
@@ -205,24 +349,3 @@ def extraire_libgeo(values, feature, parent):
         extraire_libgeo(DEP) </p>
     """
     return re.search('(.+)\s\(',values[0]).group(1)
-    
-@qgsfunction(1, group='Thematic')
-def hexa_to_rgba(values, feature, parent):
-    """
-        Transforme une couleur Hexa en rgba.
-        
-        <h4>Syntax</h4>
-        <p>hexa_to_rgba(<i>couleur</i>)</p>
-
-        <h4>Arguments</h4>
-        <p><i>couleur</i> &rarr; couleur au format #abcdef.<br></p>
-        
-        <h4>Exemple</h4>
-        <p><!-- Show example of function.-->
-             hexa_to_rgb('#ffffff') &rarr; '255.255.255.255'</p>
-    """  
-    value = values[0].lstrip('#')
-    lv = len(value)
-    rgba = str(tuple(int(value[i:int(i+lv/3)], 16) for i in range(0, lv, int(lv/3)))).strip('()')+',255'
-    return rgba
-
